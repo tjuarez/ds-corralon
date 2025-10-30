@@ -1,0 +1,46 @@
+# Dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Base de datos
+backend/db/database.sqlite
+backend/db/*.sqlite
+*.sqlite
+
+# Variables de entorno
+.env
+.env.local
+.env.production
+
+# Build de producción
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Archivos temporales
+tmp/
+temp/
+
+# Uploads de usuarios (opcional, depende si quieres subirlos)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Coverage
+coverage/
+.nyc_output/
