@@ -573,124 +573,7 @@ const VentaForm = () => {
           </div>
         </div>
 
-        {/* Pagos Múltiples */}
-        {usarPagosMultiples && detalle.length > 0 && (
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Formas de Pago</h2>
-            
-            {pagos.map((pago, index) => {
-              const creditoDisponible = selectedCliente 
-                ? selectedCliente.limite_credito - selectedCliente.saldo_cuenta_corriente
-                : 0;
-
-              return (
-                <div key={index} style={styles.pagoRow}>
-                  <div style={styles.pagoInputs}>
-                    <div style={styles.inputGroup}>
-                      <label style={styles.label}>Forma de Pago</label>
-                      <select
-                        value={pago.forma_pago}
-                        onChange={(e) => {
-                          const newPagos = [...pagos];
-                          newPagos[index].forma_pago = e.target.value;
-                          
-                          // Si cambia a cuenta corriente, sugerir el crédito disponible
-                          if (e.target.value === 'cuenta_corriente' && creditoDisponible > 0) {
-                            const montoPendiente = totales.total - pagos.reduce((sum, p, i) => 
-                              i !== index ? sum + (parseFloat(p.monto) || 0) : sum, 0
-                            );
-                            newPagos[index].monto = Math.min(creditoDisponible, montoPendiente).toFixed(2);
-                          }
-                          
-                          setPagos(newPagos);
-                        }}
-                        style={styles.select}
-                      >
-                        <option value="efectivo">Efectivo</option>
-                        <option value="tarjeta">Tarjeta</option>
-                        <option value="transferencia">Transferencia</option>
-                        <option value="cheque">Cheque</option>
-                        <option value="cuenta_corriente">
-                          Cuenta Corriente {creditoDisponible > 0 && `(Disp: $${creditoDisponible.toFixed(2)})`}
-                        </option>
-                      </select>
-                    </div>
-
-                    <div style={styles.inputGroup}>
-                      <label style={styles.label}>Monto</label>
-                      <input
-                        type="number"
-                        value={pago.monto}
-                        onChange={(e) => {
-                          const newPagos = [...pagos];
-                          const nuevoMonto = parseFloat(e.target.value) || 0;
-                          
-                          // Validar límite de crédito si es cuenta corriente
-                          if (pago.forma_pago === 'cuenta_corriente' && nuevoMonto > creditoDisponible) {
-                            alert(`El monto supera el crédito disponible ($${creditoDisponible.toFixed(2)})`);
-                            return;
-                          }
-                          
-                          newPagos[index].monto = e.target.value;
-                          setPagos(newPagos);
-                        }}
-                        style={styles.input}
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setPagos(pagos.filter((_, i) => i !== index))}
-                    style={styles.removePagoButton}
-                    disabled={pagos.length === 1}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              );
-            })}
-
-            <button
-              type="button"
-              onClick={() => setPagos([...pagos, { forma_pago: 'efectivo', monto: '' }])}
-              style={styles.addPagoButton}
-            >
-              <Plus size={16} style={{ marginRight: '6px' }} />
-              Agregar Forma de Pago
-            </button>
-
-            {/* Resumen de pagos */}
-            <div style={styles.resumenPagos}>
-              <div style={styles.resumenRow}>
-                <span>Total a pagar:</span>
-                <span style={{ fontWeight: 'bold' }}>
-                  {formatCurrency(totales.total, monedaActual?.simbolo)}
-                </span>
-              </div>
-              <div style={styles.resumenRow}>
-                <span>Total pagos:</span>
-                <span style={{ 
-                  fontWeight: 'bold',
-                  color: Math.abs(pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0) - totales.total) < 0.01 
-                    ? '#10b981' 
-                    : '#dc2626'
-                }}>
-                  {formatCurrency(pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0), monedaActual?.simbolo)}
-                </span>
-              </div>
-              <div style={styles.resumenRow}>
-                <span>Diferencia:</span>
-                <span style={{ fontWeight: 'bold', color: '#dc2626' }}>
-                  {formatCurrency(totales.total - pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0), monedaActual?.simbolo)}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
+        
 
         {/* Productos */}
         <div style={styles.section}>
@@ -892,6 +775,125 @@ const VentaForm = () => {
           </div>
         )}
 
+{/* Pagos Múltiples */}
+        {usarPagosMultiples && detalle.length > 0 && (
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>Formas de Pago</h2>
+            
+            {pagos.map((pago, index) => {
+              const creditoDisponible = selectedCliente 
+                ? selectedCliente.limite_credito - selectedCliente.saldo_cuenta_corriente
+                : 0;
+
+              return (
+                <div key={index} style={styles.pagoRow}>
+                  <div style={styles.pagoInputs}>
+                    <div style={styles.inputGroup}>
+                      <label style={styles.label}>Forma de Pago</label>
+                      <select
+                        value={pago.forma_pago}
+                        onChange={(e) => {
+                          const newPagos = [...pagos];
+                          newPagos[index].forma_pago = e.target.value;
+                          
+                          // Si cambia a cuenta corriente, sugerir el crédito disponible
+                          if (e.target.value === 'cuenta_corriente' && creditoDisponible > 0) {
+                            const montoPendiente = totales.total - pagos.reduce((sum, p, i) => 
+                              i !== index ? sum + (parseFloat(p.monto) || 0) : sum, 0
+                            );
+                            newPagos[index].monto = Math.min(creditoDisponible, montoPendiente).toFixed(2);
+                          }
+                          
+                          setPagos(newPagos);
+                        }}
+                        style={styles.select}
+                      >
+                        <option value="efectivo">Efectivo</option>
+                        <option value="tarjeta">Tarjeta</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="cheque">Cheque</option>
+                        <option value="cuenta_corriente">
+                          Cuenta Corriente {creditoDisponible > 0 && `(Disp: $${creditoDisponible.toFixed(2)})`}
+                        </option>
+                      </select>
+                    </div>
+
+                    <div style={styles.inputGroup}>
+                      <label style={styles.label}>Monto</label>
+                      <input
+                        type="number"
+                        value={pago.monto}
+                        onChange={(e) => {
+                          const newPagos = [...pagos];
+                          const nuevoMonto = parseFloat(e.target.value) || 0;
+                          
+                          // Validar límite de crédito si es cuenta corriente
+                          if (pago.forma_pago === 'cuenta_corriente' && nuevoMonto > creditoDisponible) {
+                            alert(`El monto supera el crédito disponible ($${creditoDisponible.toFixed(2)})`);
+                            return;
+                          }
+                          
+                          newPagos[index].monto = e.target.value;
+                          setPagos(newPagos);
+                        }}
+                        style={styles.input}
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setPagos(pagos.filter((_, i) => i !== index))}
+                    style={styles.removePagoButton}
+                    disabled={pagos.length === 1}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => setPagos([...pagos, { forma_pago: 'efectivo', monto: '' }])}
+              style={styles.addPagoButton}
+            >
+              <Plus size={16} style={{ marginRight: '6px' }} />
+              Agregar Forma de Pago
+            </button>
+
+            {/* Resumen de pagos */}
+            <div style={styles.resumenPagos}>
+              <div style={styles.resumenRow}>
+                <span>Total a pagar:</span>
+                <span style={{ fontWeight: 'bold' }}>
+                  {formatCurrency(totales.total, monedaActual?.simbolo)}
+                </span>
+              </div>
+              <div style={styles.resumenRow}>
+                <span>Total pagos:</span>
+                <span style={{ 
+                  fontWeight: 'bold',
+                  color: Math.abs(pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0) - totales.total) < 0.01 
+                    ? '#10b981' 
+                    : '#dc2626'
+                }}>
+                  {formatCurrency(pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0), monedaActual?.simbolo)}
+                </span>
+              </div>
+              <div style={styles.resumenRow}>
+                <span>Diferencia:</span>
+                <span style={{ fontWeight: 'bold', color: '#dc2626' }}>
+                  {formatCurrency(totales.total - pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0), monedaActual?.simbolo)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Observaciones */}
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Observaciones</h2>

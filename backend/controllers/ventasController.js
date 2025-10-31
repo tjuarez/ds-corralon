@@ -89,19 +89,25 @@ export const getVentaById = async (req, res) => {
     // Obtener detalle de la venta
     const detalle = await getAll(`
       SELECT vd.*,
-             p.codigo as producto_codigo,
-             p.descripcion as producto_descripcion,
-             p.unidad_medida as producto_unidad
+            p.codigo as producto_codigo,
+            p.descripcion as producto_descripcion,
+            p.unidad_medida as producto_unidad
       FROM ventas_detalle vd
       LEFT JOIN productos p ON vd.producto_id = p.id
       WHERE vd.venta_id = ?
       ORDER BY vd.id ASC
     `, [id]);
 
+    // Obtener formas de pago
+    const pagos = await getAll(`
+      SELECT * FROM ventas_pagos WHERE venta_id = ? ORDER BY id ASC
+    `, [id]);
+
     res.json({ 
       venta: { 
         ...venta, 
-        detalle 
+        detalle,
+        pagos
       } 
     });
   } catch (error) {
@@ -166,17 +172,6 @@ export const createVenta = async (req, res) => {
       });
     }
 
-    // Si hay pagos múltiples, validar que sumen el total
-    if (pagos && pagos.length > 0) {
-      const sumaPagos = pagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
-      // Usar toFixed para evitar problemas de precisión de punto flotante
-      if (Math.abs(sumaPagos - total) > 0.01) {
-        return res.status(400).json({ 
-          error: `La suma de los pagos (${sumaPagos}) no coincide con el total (${total})` 
-        });
-      }
-    }
-
     // Verificar que el cliente existe
     const cliente = await getOne('SELECT id FROM clientes WHERE id = ?', [cliente_id]);
     if (!cliente) {
@@ -213,6 +208,17 @@ export const createVenta = async (req, res) => {
 
     const descuentoMonto = descuento_monto || (subtotal * (descuento_porcentaje || 0) / 100);
     const total = subtotal - descuentoMonto;
+
+    // Si hay pagos múltiples, validar que sumen el total
+    if (pagos && pagos.length > 0) {
+      const sumaPagos = pagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
+      // Usar toFixed para evitar problemas de precisión de punto flotante
+      if (Math.abs(sumaPagos - total) > 0.01) {
+        return res.status(400).json({ 
+          error: `La suma de los pagos (${sumaPagos}) no coincide con el total (${total})` 
+        });
+      }
+    }
 
     // Generar número de comprobante
     const numero_comprobante = await generateNumeroComprobante(tipo_comprobante);
@@ -344,7 +350,7 @@ export const anularVenta = async (req, res) => {
     const { usuario_id } = req.body;
 
     const venta = await getOne(
-      'SELECT id, estado, numero_comprobante FROM ventas WHERE id = ?',
+      'SELECT id, estado, numero_comprobante, cliente_id, total, forma_pago FROM ventas WHERE id = ?',
       [id]
     );
 
@@ -388,13 +394,78 @@ export const anularVenta = async (req, res) => {
       ]);
     }
 
+    // Si la venta fue con cuenta corriente (forma de pago única), revertir
+    /*if (venta.forma_pago === 'cuenta_corriente') {
+      const cliente = await getOne(
+        'SELECT id, razon_social, saldo_cuenta_corriente FROM clientes WHERE id = ?',
+        [venta.cliente_id]
+      );
+
+      const saldoAnterior = cliente.saldo_cuenta_corriente;
+      const saldoNuevo = saldoAnterior - venta.total;
+
+      // Registrar movimiento de crédito (reversión)
+      await runQuery(`
+        INSERT INTO cuenta_corriente (
+          cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
+          concepto, venta_id, fecha, usuario_id
+        ) VALUES (?, 'credito', ?, ?, ?, ?, ?, CURRENT_DATE, ?)
+      `, [
+        venta.cliente_id, venta.total, saldoAnterior, saldoNuevo,
+        `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
+      ]);
+
+      // Actualizar saldo del cliente
+      await runQuery(
+        'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
+        [saldoNuevo, venta.cliente_id]
+      );
+    }*/
+
+    // Revertir pagos en cuenta corriente
+    const pagosCC = await getAll(
+      'SELECT * FROM ventas_pagos WHERE venta_id = ? AND forma_pago = ?',
+      [id, 'cuenta_corriente']
+    );
+
+    for (const pago of pagosCC) {
+      const cliente = await getOne(
+        'SELECT id, razon_social, saldo_cuenta_corriente FROM clientes WHERE id = ?',
+        [venta.cliente_id]
+      );
+
+      const saldoAnterior = cliente.saldo_cuenta_corriente;
+      const saldoNuevo = saldoAnterior - parseFloat(pago.monto);
+
+      // Registrar movimiento de crédito (reversión)
+      await runQuery(`
+        INSERT INTO cuenta_corriente (
+          cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
+          concepto, venta_id, fecha, usuario_id
+        ) VALUES (?, 'credito', ?, ?, ?, ?, ?, CURRENT_DATE, ?)
+      `, [
+        venta.cliente_id, pago.monto, saldoAnterior, saldoNuevo,
+        `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
+      ]);
+
+      // Actualizar saldo del cliente
+      await runQuery(
+        'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
+        [saldoNuevo, venta.cliente_id]
+      );
+    }
+
     // Marcar venta como anulada
     await runQuery(
       'UPDATE ventas SET estado = \'anulada\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [id]
     );
 
-    res.json({ message: 'Venta anulada exitosamente' });
+    const mensaje = pagosCC.length > 0 
+      ? 'Venta anulada exitosamente. Stock revertido y crédito restaurado.'
+      : 'Venta anulada exitosamente. Stock revertido.';
+
+    res.json({ message: mensaje });
   } catch (error) {
     console.error('Error en anularVenta:', error);
     res.status(500).json({ error: 'Error al anular venta' });
