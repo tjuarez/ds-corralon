@@ -329,6 +329,39 @@ export const createVenta = async (req, res) => {
           [saldoNuevo, cliente_id]
         );
       }
+
+      // Si es efectivo, registrar en caja abierta
+      if (pago.forma_pago === 'efectivo') {
+        // Buscar caja abierta del usuario
+        const cajaAbierta = await getOne(
+          'SELECT id FROM cajas WHERE usuario_apertura_id = ? AND estado = ? ORDER BY fecha_apertura DESC LIMIT 1',
+          [usuario_id, 'abierta']
+        );
+
+        if (cajaAbierta) {
+          // Registrar movimiento de ingreso en caja
+          await runQuery(`
+            INSERT INTO movimientos_caja (
+              caja_id, tipo_movimiento, categoria, monto, concepto,
+              venta_id, numero_comprobante, usuario_id
+            ) VALUES (?, 'ingreso', 'venta', ?, ?, ?, ?, ?)
+          `, [
+            cajaAbierta.id, pago.monto,
+            `Venta ${numero_comprobante}`, ventaId, numero_comprobante, usuario_id
+          ]);
+
+          // Actualizar totales de la caja
+          await runQuery(`
+            UPDATE cajas SET 
+              total_ingresos = total_ingresos + ?
+            WHERE id = ?
+          `, [pago.monto, cajaAbierta.id]);
+
+          console.log(`✓ Registrado en caja: Ingreso de $${pago.monto} por venta ${numero_comprobante}`);
+        } else {
+          console.warn(`⚠️ No hay caja abierta para registrar venta ${numero_comprobante}`);
+        }
+      }
     }
 
 
@@ -455,15 +488,66 @@ export const anularVenta = async (req, res) => {
       );
     }
 
+
+    // Revertir pagos en efectivo de la caja
+    const pagosEfectivo = await getAll(
+      'SELECT * FROM ventas_pagos WHERE venta_id = ? AND forma_pago = ?',
+      [id, 'efectivo']
+    );
+
+    for (const pago of pagosEfectivo) {
+      // Buscar el movimiento de caja relacionado
+      const movimientoCaja = await getOne(
+        'SELECT caja_id, monto FROM movimientos_caja WHERE venta_id = ? AND tipo_movimiento = ?',
+        [id, 'ingreso']
+      );
+
+      if (movimientoCaja) {
+        // Verificar que la caja esté abierta
+        const caja = await getOne(
+          'SELECT estado FROM cajas WHERE id = ?',
+          [movimientoCaja.caja_id]
+        );
+
+        if (caja && caja.estado === 'abierta') {
+          // Registrar movimiento de egreso (reversión)
+          await runQuery(`
+            INSERT INTO movimientos_caja (
+              caja_id, tipo_movimiento, categoria, monto, concepto,
+              venta_id, usuario_id
+            ) VALUES (?, 'egreso', 'devolucion', ?, ?, ?, ?)
+          `, [
+            movimientoCaja.caja_id, pago.monto,
+            `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
+          ]);
+
+          // Actualizar totales de la caja
+          await runQuery(`
+            UPDATE cajas SET 
+              total_egresos = total_egresos + ?
+            WHERE id = ?
+          `, [pago.monto, movimientoCaja.caja_id]);
+
+          console.log(`✓ Revertido en caja: Egreso de $${pago.monto} por anulación de venta`);
+        } else {
+          console.warn(`⚠️ La caja está cerrada, no se puede revertir automáticamente el movimiento de $${pago.monto}`);
+        }
+      }
+    }
+
     // Marcar venta como anulada
     await runQuery(
       'UPDATE ventas SET estado = \'anulada\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [id]
     );
 
-    const mensaje = pagosCC.length > 0 
-      ? 'Venta anulada exitosamente. Stock revertido y crédito restaurado.'
-      : 'Venta anulada exitosamente. Stock revertido.';
+    const tienePagosCC = pagosCC.length > 0;
+    const tienePagosEfectivo = pagosEfectivo.length > 0;
+
+    let mensaje = 'Venta anulada exitosamente. Stock revertido';
+    if (tienePagosCC) mensaje += ', crédito restaurado';
+    if (tienePagosEfectivo) mensaje += ', movimiento en caja registrado';
+    mensaje += '.';
 
     res.json({ message: mensaje });
   } catch (error) {

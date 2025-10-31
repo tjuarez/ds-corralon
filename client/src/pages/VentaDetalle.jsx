@@ -370,6 +370,34 @@ const VentaDetalle = () => {
           </div>
         )}
 
+
+        {/* Indicador de registro en caja */}
+        {venta.pagos && venta.pagos.some(p => p.forma_pago === 'efectivo') && (
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#d1fae5',
+            border: '2px solid #10b981',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '30px',
+          }}>
+            <DollarSign size={20} color="#065f46" />
+            <div>
+              <div style={{ fontWeight: '600', color: '#065f46' }}>
+                Pago en efectivo registrado en caja
+              </div>
+              <div style={{ fontSize: '14px', color: '#047857' }}>
+                {venta.estado === 'anulada' 
+                  ? 'El movimiento fue revertido al anular la venta'
+                  : 'Este pago se registró automáticamente como ingreso en la caja del vendedor'
+                }
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Totales */}
         <div style={styles.section}>
           <div style={styles.totalesBox}>

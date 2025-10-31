@@ -313,6 +313,20 @@ const CajaDetalle = () => {
                       <td style={styles.td}>
                         <div>
                           {mov.concepto}
+                          {mov.venta_id && (
+                            <div style={{
+                              display: 'inline-block',
+                              marginLeft: '8px',
+                              padding: '2px 8px',
+                              backgroundColor: '#dbeafe',
+                              color: '#1e40af',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              borderRadius: '4px',
+                            }}>
+                              VENTA
+                            </div>
+                          )}
                           {mov.numero_comprobante && (
                             <div style={styles.comprobante}>
                               Comp: {mov.numero_comprobante}

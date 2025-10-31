@@ -154,6 +154,42 @@ export const registrarPago = async (req, res) => {
       [saldoNuevo, cliente_id]
     );
 
+
+    // Si el pago es en efectivo, registrar en caja abierta
+    if (medio_pago === 'efectivo') {
+      // Buscar caja abierta del usuario
+      const cajaAbierta = await getOne(
+        'SELECT id FROM cajas WHERE usuario_apertura_id = ? AND estado = ? ORDER BY fecha_apertura DESC LIMIT 1',
+        [usuario_id, 'abierta']
+      );
+
+      if (cajaAbierta) {
+        // Registrar movimiento de ingreso en caja
+        await runQuery(`
+          INSERT INTO movimientos_caja (
+            caja_id, tipo_movimiento, categoria, monto, concepto,
+            numero_comprobante, observaciones, usuario_id
+          ) VALUES (?, 'ingreso', 'pago_cliente', ?, ?, ?, ?, ?)
+        `, [
+          cajaAbierta.id, montoAPagar,
+          `Pago de ${cliente.razon_social}`,
+          numero_comprobante, observaciones, usuario_id
+        ]);
+
+        // Actualizar totales de la caja
+        await runQuery(`
+          UPDATE cajas SET 
+            total_ingresos = total_ingresos + ?
+          WHERE id = ?
+        `, [montoAPagar, cajaAbierta.id]);
+
+        console.log(`✓ Registrado en caja: Ingreso de $${montoAPagar} por pago de cliente`);
+      } else {
+        console.warn(`⚠️ No hay caja abierta para registrar pago de $${montoAPagar}`);
+      }
+    }
+
+
     res.status(201).json({
       message: 'Pago registrado exitosamente',
       saldo_anterior: saldoAnterior,
