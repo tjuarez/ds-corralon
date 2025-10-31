@@ -24,6 +24,11 @@ import CompraDetalle from '../pages/CompraDetalle';
 import CuentaCorriente from '../pages/CuentaCorriente';
 import EstadoCuenta from '../pages/EstadoCuenta';
 import RegistrarPago from '../pages/RegistrarPago';
+import Caja from '../pages/Caja';
+import AbrirCaja from '../pages/AbrirCaja';
+import CajaDetalle from '../pages/CajaDetalle';
+import RegistrarMovimientoCaja from '../pages/RegistrarMovimientoCaja';
+import CerrarCaja from '../pages/CerrarCaja';
 
 const AppRoutes = () => {
   return (
@@ -164,6 +169,12 @@ const AppRoutes = () => {
       <Route path="/cuenta-corriente" element={<CuentaCorriente />} />
       <Route path="/cuenta-corriente/:clienteId" element={<EstadoCuenta />} />
       <Route path="/cuenta-corriente/:clienteId/pago" element={<RegistrarPago />} />
+
+      <Route path="/caja" element={<Caja />} />
+      <Route path="/caja/abrir" element={<AbrirCaja />} />
+      <Route path="/caja/:id" element={<CajaDetalle />} />
+      <Route path="/caja/:id/movimiento" element={<RegistrarMovimientoCaja />} />
+      <Route path="/caja/:id/cerrar" element={<CerrarCaja />} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

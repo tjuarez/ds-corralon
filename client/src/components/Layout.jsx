@@ -53,8 +53,13 @@ const Layout = ({ children }) => {
     );
   }
 
+  if (user?.rol === 'admin' || user?.rol === 'cajero') {
+    menuItems.push(
+      { path: '/caja', icon: DollarSign, label: t('cashRegister') }
+    );
+  }
+
   menuItems.push(
-    { path: '/caja', icon: DollarSign, label: t('cashRegister') },
     { path: '/reportes', icon: BarChart3, label: t('reports') }
   );
 

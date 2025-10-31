@@ -371,36 +371,43 @@ const migrations = [
   // 21. Tabla de cajas
   `CREATE TABLE IF NOT EXISTS cajas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sucursal_id INTEGER NOT NULL,
-    usuario_id INTEGER NOT NULL,
+    numero INTEGER NOT NULL,
     fecha_apertura DATETIME NOT NULL,
     fecha_cierre DATETIME,
-    monto_inicial REAL NOT NULL,
-    monto_final REAL,
-    monto_esperado REAL,
-    diferencia REAL,
-    estado TEXT DEFAULT 'abierta' CHECK(estado IN ('abierta', 'cerrada')),
-    observaciones TEXT,
+    usuario_apertura_id INTEGER NOT NULL,
+    usuario_cierre_id INTEGER,
+    monto_inicial DECIMAL(10, 2) NOT NULL,
+    monto_final DECIMAL(10, 2),
+    total_ingresos DECIMAL(10, 2) DEFAULT 0,
+    total_egresos DECIMAL(10, 2) DEFAULT 0,
+    monto_esperado DECIMAL(10, 2),
+    diferencia DECIMAL(10, 2),
+    estado VARCHAR(20) DEFAULT 'abierta',
+    observaciones_apertura TEXT,
+    observaciones_cierre TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario_apertura_id) REFERENCES usuarios(id),
+    FOREIGN KEY (usuario_cierre_id) REFERENCES usuarios(id)
   )`,
 
   // 22. Tabla de movimientos de caja
   `CREATE TABLE IF NOT EXISTS movimientos_caja (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     caja_id INTEGER NOT NULL,
-    tipo_movimiento TEXT NOT NULL CHECK(tipo_movimiento IN ('ingreso', 'egreso')),
+    tipo_movimiento VARCHAR(20) NOT NULL,
+    categoria VARCHAR(50),
+    monto DECIMAL(10, 2) NOT NULL,
     concepto TEXT NOT NULL,
-    monto REAL NOT NULL,
-    moneda_id INTEGER NOT NULL,
-    forma_pago TEXT,
     venta_id INTEGER,
-    observaciones TEXT,
+    pago_cc_id INTEGER,
+    numero_comprobante VARCHAR(50),
+    usuario_id INTEGER,
     fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+    observaciones TEXT,
     FOREIGN KEY (caja_id) REFERENCES cajas(id) ON DELETE CASCADE,
-    FOREIGN KEY (moneda_id) REFERENCES monedas(id),
-    FOREIGN KEY (venta_id) REFERENCES ventas(id)
+    FOREIGN KEY (venta_id) REFERENCES ventas(id),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
   )`,
 
   // 23. Tabla de movimientos de stock
