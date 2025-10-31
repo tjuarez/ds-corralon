@@ -44,10 +44,19 @@ const Layout = ({ children }) => {
     { path: '/proveedores', icon: Truck, label: t('providers') },
     { path: '/ventas', icon: ShoppingCart, label: t('sales') },
     { path: '/presupuestos', icon: FileText, label: t('quotes') },
-    { path: '/compras', icon: ShoppingBag, label: t('purchases') },
-    { path: '/caja', icon: DollarSign, label: t('cashRegister') },
-    { path: '/reportes', icon: BarChart3, label: t('reports') },
+    { path: '/compras', icon: ShoppingBag, label: t('purchases') }
   ];
+
+  if (user?.rol === 'admin' || user?.rol === 'vendedor' || user?.rol === 'cajero') {
+    menuItems.push(
+      { path: '/cuenta-corriente', icon: DollarSign, label: t('currentAccount') }
+    );
+  }
+
+  menuItems.push(
+    { path: '/caja', icon: DollarSign, label: t('cashRegister') },
+    { path: '/reportes', icon: BarChart3, label: t('reports') }
+  );
 
   // Solo admins pueden ver configuración y usuarios
   if (user?.rol === 'admin') {

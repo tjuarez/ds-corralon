@@ -201,6 +201,26 @@ const translations = {
     //total: 'Total',
     discountPercentage: 'Descuento %',
     discountAmount: 'Descuento Monto',
+
+    // Cuenta Corriente
+    accountStatement: 'Estado de Cuenta',
+    registerPayment: 'Registrar Pago',
+    payment: 'Pago',
+    payments: 'Pagos',
+    debt: 'Deuda',
+    balance: 'Saldo',
+    availableCredit: 'Crédito Disponible',
+    overLimit: 'Sobre Límite',
+    debit: 'Débito',
+    credit: 'Crédito',
+    receiptNumber: 'Número de Comprobante',
+    dueDate: 'Fecha de Vencimiento',
+    previousBalance: 'Saldo Anterior',
+    newBalance: 'Saldo Nuevo',
+    totalDebt: 'Deuda Total',
+    clientsWithDebt: 'Clientes con Deuda',
+    topDebtors: 'Mayores Deudores',
+    recentMovements: 'Movimientos Recientes',
   },
   
   en: {
@@ -393,6 +413,26 @@ const translations = {
     //total: 'Total',
     discountPercentage: 'Discount %',
     discountAmount: 'Discount Amount',
+
+    // Current Account
+    accountStatement: 'Account Statement',
+    registerPayment: 'Register Payment',
+    payment: 'Payment',
+    payments: 'Payments',
+    debt: 'Debt',
+    balance: 'Balance',
+    availableCredit: 'Available Credit',
+    overLimit: 'Over Limit',
+    debit: 'Debit',
+    credit: 'Credit',
+    receiptNumber: 'Receipt Number',
+    dueDate: 'Due Date',
+    previousBalance: 'Previous Balance',
+    newBalance: 'New Balance',
+    totalDebt: 'Total Debt',
+    clientsWithDebt: 'Clients with Debt',
+    topDebtors: 'Top Debtors',
+    recentMovements: 'Recent Movements',
   },
   
   pt: {
@@ -585,6 +625,26 @@ const translations = {
     //total: 'Total',
     discountPercentage: 'Desconto %',
     discountAmount: 'Valor do Desconto',
+
+    // Conta Corrente
+    accountStatement: 'Extrato de Conta',
+    registerPayment: 'Registrar Pagamento',
+    payment: 'Pagamento',
+    payments: 'Pagamentos',
+    debt: 'Dívida',
+    balance: 'Saldo',
+    availableCredit: 'Crédito Disponível',
+    overLimit: 'Acima do Limite',
+    debit: 'Débito',
+    credit: 'Crédito',
+    receiptNumber: 'Número do Comprovante',
+    dueDate: 'Data de Vencimento',
+    previousBalance: 'Saldo Anterior',
+    newBalance: 'Saldo Novo',
+    totalDebt: 'Dívida Total',
+    clientsWithDebt: 'Clientes com Dívida',
+    topDebtors: 'Maiores Devedores',
+    recentMovements: 'Movimentos Recentes',
   }
 };
 

@@ -1,7 +1,7 @@
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import Layout from '../components/Layout';
-import { ShoppingCart, UserPlus, PackagePlus, FileText, TrendingUp, Users as UsersIcon, Package, FilePlus } from 'lucide-react';
+import { ShoppingCart, UserPlus, PackagePlus, FileText, TrendingUp, Users as UsersIcon, Package, FilePlus, DollarSign } from 'lucide-react';
 
 const Dashboard = () => {
   const { user } = useAuth();

@@ -21,6 +21,9 @@ import VentaDetalle from '../pages/VentaDetalle';
 import Compras from '../pages/Compras';
 import CompraForm from '../pages/CompraForm';
 import CompraDetalle from '../pages/CompraDetalle';
+import CuentaCorriente from '../pages/CuentaCorriente';
+import EstadoCuenta from '../pages/EstadoCuenta';
+import RegistrarPago from '../pages/RegistrarPago';
 
 const AppRoutes = () => {
   return (
@@ -157,6 +160,10 @@ const AppRoutes = () => {
       <Route path="/compras" element={<Compras />} />
       <Route path="/compras/nueva" element={<CompraForm />} />
       <Route path="/compras/:id" element={<CompraDetalle />} />
+
+      <Route path="/cuenta-corriente" element={<CuentaCorriente />} />
+      <Route path="/cuenta-corriente/:clienteId" element={<EstadoCuenta />} />
+      <Route path="/cuenta-corriente/:clienteId/pago" element={<RegistrarPago />} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

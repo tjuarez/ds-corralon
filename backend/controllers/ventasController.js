@@ -146,16 +146,35 @@ export const createVenta = async (req, res) => {
       descuento_porcentaje,
       descuento_monto,
       forma_pago,
+      pagos,
       observaciones,
       usuario_id,
       presupuesto_id
     } = req.body;
 
     // Validaciones
-    if (!cliente_id || !fecha || !tipo_comprobante || !moneda_id || !detalle || detalle.length === 0 || !forma_pago) {
+    if (!cliente_id || !fecha || !moneda_id || !detalle || detalle.length === 0) {
       return res.status(400).json({ 
-        error: 'Cliente, fecha, tipo de comprobante, moneda, forma de pago y al menos un producto son obligatorios' 
+        error: 'Cliente, fecha, moneda y al menos un producto son obligatorios' 
       });
+    }
+
+    // Validar que haya al menos una forma de pago
+    if (!forma_pago && (!pagos || pagos.length === 0)) {
+      return res.status(400).json({ 
+        error: 'Debe especificar al menos una forma de pago' 
+      });
+    }
+
+    // Si hay pagos múltiples, validar que sumen el total
+    if (pagos && pagos.length > 0) {
+      const sumaPagos = pagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
+      // Usar toFixed para evitar problemas de precisión de punto flotante
+      if (Math.abs(sumaPagos - total) > 0.01) {
+        return res.status(400).json({ 
+          error: `La suma de los pagos (${sumaPagos}) no coincide con el total (${total})` 
+        });
+      }
     }
 
     // Verificar que el cliente existe
@@ -198,17 +217,18 @@ export const createVenta = async (req, res) => {
     // Generar número de comprobante
     const numero_comprobante = await generateNumeroComprobante(tipo_comprobante);
 
-    // Insertar venta
+    // Insertar venta (forma_pago puede ser null si hay múltiples pagos)
+    const formaPagoVenta = forma_pago || 'multiple';
     const result = await runQuery(`
       INSERT INTO ventas (
         numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
         subtotal, descuento_porcentaje, descuento_monto, impuestos, total,
         forma_pago, estado, observaciones, presupuesto_id, usuario_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'completada', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?)
     `, [
       numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
-      subtotal, descuento_porcentaje || 0, descuentoMonto, total,
-      forma_pago, observaciones, presupuesto_id, usuario_id
+      subtotal, descuento_porcentaje || 0, descuentoMonto, 0, total,
+      formaPagoVenta, observaciones, presupuesto_id, usuario_id
     ]);
 
     const ventaId = result.id;
@@ -264,6 +284,47 @@ export const createVenta = async (req, res) => {
         [presupuesto_id]
       );
     }
+
+
+    // Procesar pagos
+    const pagosList = pagos && pagos.length > 0 ? pagos : [{ forma_pago: forma_pago, monto: total }];
+
+    for (const pago of pagosList) {
+      // Insertar detalle del pago
+      await runQuery(`
+        INSERT INTO ventas_pagos (venta_id, forma_pago, monto, observaciones)
+        VALUES (?, ?, ?, ?)
+      `, [ventaId, pago.forma_pago, pago.monto, pago.observaciones || null]);
+
+      // Si es cuenta corriente, registrar movimiento
+      if (pago.forma_pago === 'cuenta_corriente') {
+        const cliente = await getOne(
+          'SELECT saldo_cuenta_corriente, limite_credito, razon_social FROM clientes WHERE id = ?',
+          [cliente_id]
+        );
+
+        const saldoAnterior = cliente.saldo_cuenta_corriente;
+        const saldoNuevo = saldoAnterior + parseFloat(pago.monto);
+
+        // Registrar movimiento de débito (deuda)
+        await runQuery(`
+          INSERT INTO cuenta_corriente (
+            cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
+            concepto, venta_id, fecha, usuario_id
+          ) VALUES (?, 'debito', ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          cliente_id, pago.monto, saldoAnterior, saldoNuevo,
+          `Venta ${numero_comprobante}`, ventaId, fecha, usuario_id
+        ]);
+
+        // Actualizar saldo del cliente
+        await runQuery(
+          'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
+          [saldoNuevo, cliente_id]
+        );
+      }
+    }
+
 
     res.status(201).json({
       message: 'Venta creada exitosamente',

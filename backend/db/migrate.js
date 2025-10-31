@@ -76,13 +76,15 @@ const migrations = [
     localidad TEXT,
     provincia TEXT,
     codigo_postal TEXT,
-    limite_credito REAL DEFAULT 0,
     condicion_pago TEXT DEFAULT 'contado',
     lista_precio_id INTEGER,
     nivel_fidelizacion TEXT DEFAULT 'bronce' CHECK(nivel_fidelizacion IN ('bronce', 'plata', 'oro')),
     puntos_fidelizacion INTEGER DEFAULT 0,
     observaciones TEXT,
     activo INTEGER DEFAULT 1,
+    limite_credito DECIMAL(10, 2) DEFAULT 0,
+    saldo_cuenta_corriente DECIMAL(10, 2) DEFAULT 0,
+    dias_vencimiento_cc INTEGER DEFAULT 30,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -313,23 +315,36 @@ const migrations = [
     FOREIGN KEY (producto_id) REFERENCES productos(id)
   )`,
 
+  // Tabla de pagos de ventas (para pagos mixtos)
+  `CREATE TABLE IF NOT EXISTS ventas_pagos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    venta_id INTEGER NOT NULL,
+    forma_pago VARCHAR(20) NOT NULL,
+    monto DECIMAL(10, 2) NOT NULL,
+    observaciones TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE
+  )`,
+
   // 19. Tabla de cuenta corriente
   `CREATE TABLE IF NOT EXISTS cuenta_corriente (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cliente_id INTEGER NOT NULL,
-    tipo_movimiento TEXT NOT NULL CHECK(tipo_movimiento IN ('debe', 'haber')),
+    tipo_movimiento VARCHAR(20) NOT NULL,
+    monto DECIMAL(10, 2) NOT NULL,
+    saldo_anterior DECIMAL(10, 2) NOT NULL,
+    saldo_nuevo DECIMAL(10, 2) NOT NULL,
     concepto TEXT NOT NULL,
-    monto REAL NOT NULL,
-    moneda_id INTEGER NOT NULL,
-    fecha DATE NOT NULL,
     venta_id INTEGER,
-    pago_id INTEGER,
-    saldo REAL NOT NULL,
+    fecha DATE NOT NULL,
+    fecha_vencimiento DATE,
+    medio_pago VARCHAR(20),
+    numero_comprobante VARCHAR(50),
     observaciones TEXT,
     usuario_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (cliente_id) REFERENCES clientes(id),
-    FOREIGN KEY (moneda_id) REFERENCES monedas(id),
     FOREIGN KEY (venta_id) REFERENCES ventas(id),
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
   )`,

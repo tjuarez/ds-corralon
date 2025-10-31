@@ -15,6 +15,7 @@ import presupuestosRoutes from './backend/routes/presupuestos.js';
 import ventasRoutes from './backend/routes/ventas.js';
 import comprasRoutes from './backend/routes/compras.js';
 import uploadRoutes from './backend/routes/upload.js';
+import cuentaCorrienteRoutes from './backend/routes/cuentaCorriente.js';
 
 // Configuración de variables de entorno
 dotenv.config();
@@ -54,6 +55,7 @@ app.use('/api/proveedores', proveedoresRoutes);
 app.use('/api/presupuestos', presupuestosRoutes);
 app.use('/api/ventas', ventasRoutes);
 app.use('/api/compras', comprasRoutes);
+app.use('/api/cuenta-corriente', cuentaCorrienteRoutes);
 app.use('/api/upload', uploadRoutes);
 
 // En producción, servir el frontend compilado
