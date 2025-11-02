@@ -4,12 +4,17 @@ const migrations = [
   // 1. Tabla de sucursales
   `CREATE TABLE IF NOT EXISTS sucursales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
+    codigo VARCHAR(20) UNIQUE NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
     direccion TEXT,
-    telefono TEXT,
-    email TEXT,
-    codigo TEXT UNIQUE,
-    activa INTEGER DEFAULT 1,
+    pais VARCHAR(100),
+    provincia VARCHAR(100),
+    ciudad VARCHAR(100),
+    codigo_postal VARCHAR(10),
+    telefono VARCHAR(50),
+    email VARCHAR(100),
+    responsable VARCHAR(100),
+    activa BOOLEAN DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -467,8 +472,8 @@ const seedData = async () => {
 
     // 3. Insertar sucursal principal
     await runQuery(`
-      INSERT OR IGNORE INTO sucursales (nombre, codigo, activa) VALUES
-      ('Sucursal Principal', 'PRINCIPAL', 1)
+      INSERT OR IGNORE INTO sucursales (codigo, nombre, direccion, pais, provincia, ciudad, activa)
+      VALUES ('CASA-CENTRAL', 'Casa Central', 'Av. Principal 123', 'Argentina', 'Buenos Aires', 'Lomas de Zamora', 1)
     `);
 
     // 4. Insertar usuario administrador por defecto
@@ -477,8 +482,8 @@ const seedData = async () => {
     const hashedPassword = await bcrypt.hash('admin123', 10);
     
     await runQuery(`
-      INSERT OR IGNORE INTO usuarios (username, password, nombre, apellido, email, rol, sucursal_id, activo) VALUES
-      ('admin', ?, 'Administrador', 'Sistema', 'admin@corralon.com', 'admin', 1, 1)
+      INSERT OR IGNORE INTO usuarios (username, nombre, apellido, email, password, rol, sucursal_id, activo)
+      VALUES ('admin', 'Admin', 'Sistema', 'admin@corralon.com', '${hashedPassword}', 'admin', 1, 1)
     `, [hashedPassword]);
 
     // 5. Insertar configuración básica

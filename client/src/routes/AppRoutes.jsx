@@ -36,6 +36,8 @@ import ReporteStock from '../pages/ReporteStock';
 import ReporteClientes from '../pages/ReporteClientes';
 import ReporteCaja from '../pages/ReporteCaja';
 import ReporteRentabilidad from '../pages/ReporteRentabilidad';
+import Sucursales from '../pages/Sucursales';
+import SucursalForm from '../pages/SucursalForm';
 
 const AppRoutes = () => {
   return (
@@ -190,6 +192,10 @@ const AppRoutes = () => {
       <Route path="/reportes/clientes" element={<ReporteClientes />} />
       <Route path="/reportes/caja" element={<ReporteCaja />} />
       <Route path="/reportes/rentabilidad" element={<ReporteRentabilidad />} />
+
+      <Route path="/sucursales" element={<Sucursales />} />
+      <Route path="/sucursales/nueva" element={<SucursalForm />} />
+      <Route path="/sucursales/:id/editar" element={<SucursalForm />} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

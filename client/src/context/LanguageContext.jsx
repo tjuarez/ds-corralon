@@ -292,6 +292,24 @@ const translations = {
     profitability: 'Rentabilidad',
     margin: 'Margen',
     profit: 'Ganancia',
+
+    // Sucursales
+    //branches: 'Sucursales',
+    branch: 'Sucursal',
+    newBranch: 'Nueva Sucursal',
+    editBranch: 'Editar Sucursal',
+    branchCode: 'Código',
+    branchName: 'Nombre',
+    //address: 'Dirección',
+    //city: 'Ciudad',
+    //province: 'Provincia',
+    //postalCode: 'Código Postal',
+    //phone: 'Teléfono',
+    //email: 'Email',
+    manager: 'Responsable',
+    active: 'Activa',
+    inactive: 'Inactiva',
+    activeBranches: 'Sucursales Activas',
   },
   
   en: {
@@ -575,6 +593,24 @@ const translations = {
     profitability: 'Profitability',
     margin: 'Margin',
     profit: 'Profit',
+
+    // Branches
+    //branches: 'Branches',
+    branch: 'Branch',
+    newBranch: 'New Branch',
+    editBranch: 'Edit Branch',
+    branchCode: 'Code',
+    branchName: 'Name',
+    //address: 'Address',
+    //city: 'City',
+    //province: 'Province',
+    //postalCode: 'Postal Code',
+    //phone: 'Phone',
+    //email: 'Email',
+    manager: 'Manager',
+    active: 'Active',
+    inactive: 'Inactive',
+    activeBranches: 'Active Branches',
   },
   
   pt: {
@@ -858,6 +894,24 @@ const translations = {
     profitability: 'Rentabilidade',
     margin: 'Margem',
     profit: 'Lucro',
+
+    // Filiais
+    //branches: 'Filiais',
+    branch: 'Filial',
+    newBranch: 'Nova Filial',
+    editBranch: 'Editar Filial',
+    branchCode: 'Código',
+    branchName: 'Nome',
+    //address: 'Endereço',
+    //city: 'Cidade',
+    //province: 'Província',
+    //postalCode: 'CEP',
+    //phone: 'Telefone',
+    //email: 'Email',
+    manager: 'Responsável',
+    active: 'Ativa',
+    inactive: 'Inativa',
+    activeBranches: 'Filiais Ativas',
   }
 };
 
