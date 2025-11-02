@@ -38,7 +38,7 @@ const Layout = ({ children }) => {
   };
 
   const menuItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: t('dashboard') },
+    { path: '/dashboard', icon: BarChart3, label: t('dashboard') },
     { path: '/clientes', icon: Users, label: t('clients') },
     { path: '/productos', icon: Package, label: t('products') },
     { path: '/proveedores', icon: Truck, label: t('providers') },

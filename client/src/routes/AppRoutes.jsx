@@ -29,6 +29,12 @@ import AbrirCaja from '../pages/AbrirCaja';
 import CajaDetalle from '../pages/CajaDetalle';
 import RegistrarMovimientoCaja from '../pages/RegistrarMovimientoCaja';
 import CerrarCaja from '../pages/CerrarCaja';
+import ReporteVentas from '../pages/ReporteVentas';
+import ReporteProductos from '../pages/ReporteProductos';
+import ReporteStock from '../pages/ReporteStock';
+import ReporteClientes from '../pages/ReporteClientes';
+import ReporteCaja from '../pages/ReporteCaja';
+import ReporteRentabilidad from '../pages/ReporteRentabilidad';
 
 const AppRoutes = () => {
   return (
@@ -175,6 +181,13 @@ const AppRoutes = () => {
       <Route path="/caja/:id" element={<CajaDetalle />} />
       <Route path="/caja/:id/movimiento" element={<RegistrarMovimientoCaja />} />
       <Route path="/caja/:id/cerrar" element={<CerrarCaja />} />
+
+      <Route path="/reportes/ventas" element={<ReporteVentas />} />
+      <Route path="/reportes/productos" element={<ReporteProductos />} />
+      <Route path="/reportes/stock" element={<ReporteStock />} />
+      <Route path="/reportes/clientes" element={<ReporteClientes />} />
+      <Route path="/reportes/caja" element={<ReporteCaja />} />
+      <Route path="/reportes/rentabilidad" element={<ReporteRentabilidad />} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
