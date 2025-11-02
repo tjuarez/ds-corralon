@@ -29,6 +29,7 @@ import AbrirCaja from '../pages/AbrirCaja';
 import CajaDetalle from '../pages/CajaDetalle';
 import RegistrarMovimientoCaja from '../pages/RegistrarMovimientoCaja';
 import CerrarCaja from '../pages/CerrarCaja';
+import Reportes from '../pages/Reportes';
 import ReporteVentas from '../pages/ReporteVentas';
 import ReporteProductos from '../pages/ReporteProductos';
 import ReporteStock from '../pages/ReporteStock';
@@ -182,6 +183,7 @@ const AppRoutes = () => {
       <Route path="/caja/:id/movimiento" element={<RegistrarMovimientoCaja />} />
       <Route path="/caja/:id/cerrar" element={<CerrarCaja />} />
 
+      <Route path="/reportes" element={<Reportes />} />
       <Route path="/reportes/ventas" element={<ReporteVentas />} />
       <Route path="/reportes/productos" element={<ReporteProductos />} />
       <Route path="/reportes/stock" element={<ReporteStock />} />
