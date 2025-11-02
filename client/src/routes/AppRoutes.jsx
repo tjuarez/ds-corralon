@@ -38,6 +38,8 @@ import ReporteCaja from '../pages/ReporteCaja';
 import ReporteRentabilidad from '../pages/ReporteRentabilidad';
 import Sucursales from '../pages/Sucursales';
 import SucursalForm from '../pages/SucursalForm';
+import Usuarios from '../pages/Usuarios';
+import UsuarioForm from '../pages/UsuarioForm';
 
 const AppRoutes = () => {
   return (
@@ -196,6 +198,10 @@ const AppRoutes = () => {
       <Route path="/sucursales" element={<Sucursales />} />
       <Route path="/sucursales/nueva" element={<SucursalForm />} />
       <Route path="/sucursales/:id/editar" element={<SucursalForm />} />
+
+      <Route path="/usuarios" element={<Usuarios />} />
+      <Route path="/usuarios/nuevo" element={<UsuarioForm />} />
+      <Route path="/usuarios/:id/editar" element={<UsuarioForm />} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

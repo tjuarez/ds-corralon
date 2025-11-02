@@ -479,12 +479,64 @@ const seedData = async () => {
     // 4. Insertar usuario administrador por defecto
     // Contraseña: admin123 (deberá cambiarla en el primer login)
     const bcrypt = await import('bcrypt');
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    //const hashedPassword = await bcrypt.hash('admin123', 10);
     
-    await runQuery(`
-      INSERT OR IGNORE INTO usuarios (username, nombre, apellido, email, password, rol, sucursal_id, activo)
-      VALUES ('admin', 'Admin', 'Sistema', 'admin@corralon.com', '${hashedPassword}', 'admin', 1, 1)
-    `, [hashedPassword]);
+    // Usuarios por defecto
+    const usuarios = [
+      {
+        username: 'admin',
+        nombre: 'Admin',
+        apellido: 'Sistema',
+        email: 'admin@corralon.com',
+        password: bcrypt.hashSync('admin123', 10),
+        rol: 'admin',
+        sucursal_id: 1,
+      },
+      {
+        username: 'vendedor1',
+        nombre: 'Juan',
+        apellido: 'Pérez',
+        email: 'juan.perez@corralon.com',
+        password: bcrypt.hashSync('vendedor123', 10),
+        rol: 'vendedor',
+        sucursal_id: 1,
+      },
+      {
+        username: 'vendedor2',
+        nombre: 'Ana',
+        apellido: 'Martínez',
+        email: 'ana.martinez@corralon.com',
+        password: bcrypt.hashSync('vendedor123', 10),
+        rol: 'vendedor',
+        sucursal_id: 1,
+      },
+      {
+        username: 'cajero1',
+        nombre: 'María',
+        apellido: 'González',
+        email: 'maria.gonzalez@corralon.com',
+        password: bcrypt.hashSync('cajero123', 10),
+        rol: 'cajero',
+        sucursal_id: 1,
+      },
+      {
+        username: 'cajero2',
+        nombre: 'Carlos',
+        apellido: 'Rodríguez',
+        email: 'carlos.rodriguez@corralon.com',
+        password: bcrypt.hashSync('cajero123', 10),
+        rol: 'cajero',
+        sucursal_id: 1,
+      },
+    ];
+
+    for (const usuario of usuarios) {
+      await runQuery(`
+        INSERT OR IGNORE INTO usuarios (username, nombre, apellido, email, password, rol, sucursal_id, activo)
+        VALUES ('${usuario.username}', '${usuario.nombre}', '${usuario.apellido}', '${usuario.email}', '${usuario.password}', '${usuario.rol}', ${usuario.sucursal_id}, 1)
+      `);
+    }
+
 
     // 5. Insertar configuración básica
     await runQuery(`
