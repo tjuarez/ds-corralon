@@ -89,19 +89,25 @@ export const getVentaById = async (req, res) => {
     // Obtener detalle de la venta
     const detalle = await getAll(`
       SELECT vd.*,
-             p.codigo as producto_codigo,
-             p.descripcion as producto_descripcion,
-             p.unidad_medida as producto_unidad
+            p.codigo as producto_codigo,
+            p.descripcion as producto_descripcion,
+            p.unidad_medida as producto_unidad
       FROM ventas_detalle vd
       LEFT JOIN productos p ON vd.producto_id = p.id
       WHERE vd.venta_id = ?
       ORDER BY vd.id ASC
     `, [id]);
 
+    // Obtener formas de pago
+    const pagos = await getAll(`
+      SELECT * FROM ventas_pagos WHERE venta_id = ? ORDER BY id ASC
+    `, [id]);
+
     res.json({ 
       venta: { 
         ...venta, 
-        detalle 
+        detalle,
+        pagos
       } 
     });
   } catch (error) {
@@ -146,15 +152,23 @@ export const createVenta = async (req, res) => {
       descuento_porcentaje,
       descuento_monto,
       forma_pago,
+      pagos,
       observaciones,
       usuario_id,
       presupuesto_id
     } = req.body;
 
     // Validaciones
-    if (!cliente_id || !fecha || !tipo_comprobante || !moneda_id || !detalle || detalle.length === 0 || !forma_pago) {
+    if (!cliente_id || !fecha || !moneda_id || !detalle || detalle.length === 0) {
       return res.status(400).json({ 
-        error: 'Cliente, fecha, tipo de comprobante, moneda, forma de pago y al menos un producto son obligatorios' 
+        error: 'Cliente, fecha, moneda y al menos un producto son obligatorios' 
+      });
+    }
+
+    // Validar que haya al menos una forma de pago
+    if (!forma_pago && (!pagos || pagos.length === 0)) {
+      return res.status(400).json({ 
+        error: 'Debe especificar al menos una forma de pago' 
       });
     }
 
@@ -195,20 +209,32 @@ export const createVenta = async (req, res) => {
     const descuentoMonto = descuento_monto || (subtotal * (descuento_porcentaje || 0) / 100);
     const total = subtotal - descuentoMonto;
 
+    // Si hay pagos múltiples, validar que sumen el total
+    if (pagos && pagos.length > 0) {
+      const sumaPagos = pagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
+      // Usar toFixed para evitar problemas de precisión de punto flotante
+      if (Math.abs(sumaPagos - total) > 0.01) {
+        return res.status(400).json({ 
+          error: `La suma de los pagos (${sumaPagos}) no coincide con el total (${total})` 
+        });
+      }
+    }
+
     // Generar número de comprobante
     const numero_comprobante = await generateNumeroComprobante(tipo_comprobante);
 
-    // Insertar venta
+    // Insertar venta (forma_pago puede ser null si hay múltiples pagos)
+    const formaPagoVenta = forma_pago || 'multiple';
     const result = await runQuery(`
       INSERT INTO ventas (
         numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
         subtotal, descuento_porcentaje, descuento_monto, impuestos, total,
         forma_pago, estado, observaciones, presupuesto_id, usuario_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 'completada', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?)
     `, [
       numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
-      subtotal, descuento_porcentaje || 0, descuentoMonto, total,
-      forma_pago, observaciones, presupuesto_id, usuario_id
+      subtotal, descuento_porcentaje || 0, descuentoMonto, 0, total,
+      formaPagoVenta, observaciones, presupuesto_id, usuario_id
     ]);
 
     const ventaId = result.id;
@@ -265,6 +291,80 @@ export const createVenta = async (req, res) => {
       );
     }
 
+
+    // Procesar pagos
+    const pagosList = pagos && pagos.length > 0 ? pagos : [{ forma_pago: forma_pago, monto: total }];
+
+    for (const pago of pagosList) {
+      // Insertar detalle del pago
+      await runQuery(`
+        INSERT INTO ventas_pagos (venta_id, forma_pago, monto, observaciones)
+        VALUES (?, ?, ?, ?)
+      `, [ventaId, pago.forma_pago, pago.monto, pago.observaciones || null]);
+
+      // Si es cuenta corriente, registrar movimiento
+      if (pago.forma_pago === 'cuenta_corriente') {
+        const cliente = await getOne(
+          'SELECT saldo_cuenta_corriente, limite_credito, razon_social FROM clientes WHERE id = ?',
+          [cliente_id]
+        );
+
+        const saldoAnterior = cliente.saldo_cuenta_corriente;
+        const saldoNuevo = saldoAnterior + parseFloat(pago.monto);
+
+        // Registrar movimiento de débito (deuda)
+        await runQuery(`
+          INSERT INTO cuenta_corriente (
+            cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
+            concepto, venta_id, fecha, usuario_id
+          ) VALUES (?, 'debito', ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          cliente_id, pago.monto, saldoAnterior, saldoNuevo,
+          `Venta ${numero_comprobante}`, ventaId, fecha, usuario_id
+        ]);
+
+        // Actualizar saldo del cliente
+        await runQuery(
+          'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
+          [saldoNuevo, cliente_id]
+        );
+      }
+
+      // Si es efectivo, registrar en caja abierta
+      if (pago.forma_pago === 'efectivo') {
+        // Buscar caja abierta del usuario
+        const cajaAbierta = await getOne(
+          'SELECT id FROM cajas WHERE usuario_apertura_id = ? AND estado = ? ORDER BY fecha_apertura DESC LIMIT 1',
+          [usuario_id, 'abierta']
+        );
+
+        if (cajaAbierta) {
+          // Registrar movimiento de ingreso en caja
+          await runQuery(`
+            INSERT INTO movimientos_caja (
+              caja_id, tipo_movimiento, categoria, monto, concepto,
+              venta_id, numero_comprobante, usuario_id
+            ) VALUES (?, 'ingreso', 'venta', ?, ?, ?, ?, ?)
+          `, [
+            cajaAbierta.id, pago.monto,
+            `Venta ${numero_comprobante}`, ventaId, numero_comprobante, usuario_id
+          ]);
+
+          // Actualizar totales de la caja
+          await runQuery(`
+            UPDATE cajas SET 
+              total_ingresos = total_ingresos + ?
+            WHERE id = ?
+          `, [pago.monto, cajaAbierta.id]);
+
+          console.log(`✓ Registrado en caja: Ingreso de $${pago.monto} por venta ${numero_comprobante}`);
+        } else {
+          console.warn(`⚠️ No hay caja abierta para registrar venta ${numero_comprobante}`);
+        }
+      }
+    }
+
+
     res.status(201).json({
       message: 'Venta creada exitosamente',
       ventaId,
@@ -283,7 +383,7 @@ export const anularVenta = async (req, res) => {
     const { usuario_id } = req.body;
 
     const venta = await getOne(
-      'SELECT id, estado, numero_comprobante FROM ventas WHERE id = ?',
+      'SELECT id, estado, numero_comprobante, cliente_id, total, forma_pago FROM ventas WHERE id = ?',
       [id]
     );
 
@@ -327,13 +427,129 @@ export const anularVenta = async (req, res) => {
       ]);
     }
 
+    // Si la venta fue con cuenta corriente (forma de pago única), revertir
+    /*if (venta.forma_pago === 'cuenta_corriente') {
+      const cliente = await getOne(
+        'SELECT id, razon_social, saldo_cuenta_corriente FROM clientes WHERE id = ?',
+        [venta.cliente_id]
+      );
+
+      const saldoAnterior = cliente.saldo_cuenta_corriente;
+      const saldoNuevo = saldoAnterior - venta.total;
+
+      // Registrar movimiento de crédito (reversión)
+      await runQuery(`
+        INSERT INTO cuenta_corriente (
+          cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
+          concepto, venta_id, fecha, usuario_id
+        ) VALUES (?, 'credito', ?, ?, ?, ?, ?, CURRENT_DATE, ?)
+      `, [
+        venta.cliente_id, venta.total, saldoAnterior, saldoNuevo,
+        `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
+      ]);
+
+      // Actualizar saldo del cliente
+      await runQuery(
+        'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
+        [saldoNuevo, venta.cliente_id]
+      );
+    }*/
+
+    // Revertir pagos en cuenta corriente
+    const pagosCC = await getAll(
+      'SELECT * FROM ventas_pagos WHERE venta_id = ? AND forma_pago = ?',
+      [id, 'cuenta_corriente']
+    );
+
+    for (const pago of pagosCC) {
+      const cliente = await getOne(
+        'SELECT id, razon_social, saldo_cuenta_corriente FROM clientes WHERE id = ?',
+        [venta.cliente_id]
+      );
+
+      const saldoAnterior = cliente.saldo_cuenta_corriente;
+      const saldoNuevo = saldoAnterior - parseFloat(pago.monto);
+
+      // Registrar movimiento de crédito (reversión)
+      await runQuery(`
+        INSERT INTO cuenta_corriente (
+          cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
+          concepto, venta_id, fecha, usuario_id
+        ) VALUES (?, 'credito', ?, ?, ?, ?, ?, CURRENT_DATE, ?)
+      `, [
+        venta.cliente_id, pago.monto, saldoAnterior, saldoNuevo,
+        `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
+      ]);
+
+      // Actualizar saldo del cliente
+      await runQuery(
+        'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
+        [saldoNuevo, venta.cliente_id]
+      );
+    }
+
+
+    // Revertir pagos en efectivo de la caja
+    const pagosEfectivo = await getAll(
+      'SELECT * FROM ventas_pagos WHERE venta_id = ? AND forma_pago = ?',
+      [id, 'efectivo']
+    );
+
+    for (const pago of pagosEfectivo) {
+      // Buscar el movimiento de caja relacionado
+      const movimientoCaja = await getOne(
+        'SELECT caja_id, monto FROM movimientos_caja WHERE venta_id = ? AND tipo_movimiento = ?',
+        [id, 'ingreso']
+      );
+
+      if (movimientoCaja) {
+        // Verificar que la caja esté abierta
+        const caja = await getOne(
+          'SELECT estado FROM cajas WHERE id = ?',
+          [movimientoCaja.caja_id]
+        );
+
+        if (caja && caja.estado === 'abierta') {
+          // Registrar movimiento de egreso (reversión)
+          await runQuery(`
+            INSERT INTO movimientos_caja (
+              caja_id, tipo_movimiento, categoria, monto, concepto,
+              venta_id, usuario_id
+            ) VALUES (?, 'egreso', 'devolucion', ?, ?, ?, ?)
+          `, [
+            movimientoCaja.caja_id, pago.monto,
+            `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
+          ]);
+
+          // Actualizar totales de la caja
+          await runQuery(`
+            UPDATE cajas SET 
+              total_egresos = total_egresos + ?
+            WHERE id = ?
+          `, [pago.monto, movimientoCaja.caja_id]);
+
+          console.log(`✓ Revertido en caja: Egreso de $${pago.monto} por anulación de venta`);
+        } else {
+          console.warn(`⚠️ La caja está cerrada, no se puede revertir automáticamente el movimiento de $${pago.monto}`);
+        }
+      }
+    }
+
     // Marcar venta como anulada
     await runQuery(
       'UPDATE ventas SET estado = \'anulada\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [id]
     );
 
-    res.json({ message: 'Venta anulada exitosamente' });
+    const tienePagosCC = pagosCC.length > 0;
+    const tienePagosEfectivo = pagosEfectivo.length > 0;
+
+    let mensaje = 'Venta anulada exitosamente. Stock revertido';
+    if (tienePagosCC) mensaje += ', crédito restaurado';
+    if (tienePagosEfectivo) mensaje += ', movimiento en caja registrado';
+    mensaje += '.';
+
+    res.json({ message: mensaje });
   } catch (error) {
     console.error('Error en anularVenta:', error);
     res.status(500).json({ error: 'Error al anular venta' });

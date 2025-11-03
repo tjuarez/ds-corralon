@@ -42,6 +42,8 @@ const VentaForm = () => {
   });
 
   const [detalle, setDetalle] = useState([]);
+  const [usarPagosMultiples, setUsarPagosMultiples] = useState(false);
+  const [pagos, setPagos] = useState([]);
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [productSearch, setProductSearch] = useState('');
 
@@ -272,10 +274,49 @@ const VentaForm = () => {
       return;
     }
 
+    // Validar límite de crédito si es cuenta corriente
+    if (!usarPagosMultiples && formData.forma_pago === 'cuenta_corriente' && selectedCliente) {
+      const creditoDisponible = selectedCliente.limite_credito - selectedCliente.saldo_cuenta_corriente;
+      
+      if (totales.total > creditoDisponible) {
+        showError(
+          `El total ($${formatCurrency(totales.total)}) supera el crédito disponible del cliente ($${formatCurrency(creditoDisponible)}). ` +
+          `Use "Múltiples formas de pago" para pagar parte en cuenta corriente y parte con otro medio.`
+        );
+        return;
+      }
+      
+      // Advertencia si supera el límite de crédito pero aún no está en deuda
+      if (selectedCliente.limite_credito > 0 && totales.total > selectedCliente.limite_credito) {
+        const confirmed = window.confirm(
+          `Esta venta superará el límite de crédito del cliente.\n` +
+          `Límite: $${formatCurrency(selectedCliente.limite_credito)}\n` +
+          `Total venta: $${formatCurrency(totales.total)}\n\n` +
+          `¿Desea continuar?`
+        );
+        
+        if (!confirmed) return;
+      }
+    }
+
     // Validar stock de todos los productos
     for (const item of detalle) {
       if (item.cantidad > item.stock_disponible) {
         showError(`Stock insuficiente para ${item.producto_codigo}. Disponible: ${item.stock_disponible}`);
+        return;
+      }
+    }
+
+    // Validar pagos múltiples
+    if (usarPagosMultiples) {
+      const sumaPagos = pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0);
+      if (Math.abs(sumaPagos - totales.total) > 0.01) {
+        showError(`La suma de los pagos ($${sumaPagos.toFixed(2)}) no coincide con el total ($${totales.total.toFixed(2)})`);
+        return;
+      }
+
+      if (pagos.some(p => !p.monto || parseFloat(p.monto) <= 0)) {
+        showError('Todos los pagos deben tener un monto mayor a 0');
         return;
       }
     }
@@ -288,7 +329,6 @@ const VentaForm = () => {
         fecha: formData.fecha,
         tipo_comprobante: formData.tipo_comprobante,
         moneda_id: parseInt(formData.moneda_id),
-        forma_pago: formData.forma_pago,
         detalle: detalle.map(item => ({
           producto_id: item.producto_id,
           descripcion: item.descripcion,
@@ -299,9 +339,21 @@ const VentaForm = () => {
         descuento_porcentaje: parseFloat(formData.descuento_porcentaje) || 0,
         descuento_monto: parseFloat(formData.descuento_monto) || 0,
         observaciones: formData.observaciones,
-        usuario_id: user.id,
         presupuesto_id: presupuestoId || null,
+        usuario_id: user.id,
       };
+
+      // Agregar pagos
+      if (usarPagosMultiples) {
+        dataToSend.pagos = pagos.map(p => ({
+          forma_pago: p.forma_pago,
+          monto: parseFloat(p.monto),
+        }));
+        dataToSend.forma_pago = null;
+      } else {
+        dataToSend.forma_pago = formData.forma_pago;
+        dataToSend.pagos = null;
+      }
 
       const result = await ventasApi.create(dataToSend);
       showSuccess(`Venta ${result.numero_comprobante} creada exitosamente`);
@@ -403,18 +455,87 @@ const VentaForm = () => {
               <label style={styles.label}>
                 Forma de Pago <span style={styles.required}>*</span>
               </label>
-              <select
-                name="forma_pago"
-                value={formData.forma_pago}
-                onChange={handleChange}
-                style={styles.select}
-                required
-              >
-                <option value="efectivo">Efectivo</option>
-                <option value="tarjeta">Tarjeta</option>
-                <option value="transferencia">Transferencia</option>
-                <option value="cuenta_corriente">Cuenta Corriente</option>
-              </select>
+              
+              {!usarPagosMultiples ? (
+                <>
+                  <select
+                    name="forma_pago"
+                    value={formData.forma_pago}
+                    onChange={handleChange}
+                    style={styles.select}
+                    required={!usarPagosMultiples}
+                  >
+                    <option value="efectivo">Efectivo</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="cuenta_corriente">Cuenta Corriente</option>
+                  </select>
+
+
+                  {!usarPagosMultiples && formData.forma_pago === 'cuenta_corriente' && selectedCliente && detalle.length > 0 && (
+                    (() => {
+                      const creditoDisponible = selectedCliente.limite_credito - selectedCliente.saldo_cuenta_corriente;
+                      const excedeLimite = totales.total > creditoDisponible;
+                      
+                      return (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          backgroundColor: excedeLimite ? '#fee2e2' : '#d1fae5',
+                          border: `2px solid ${excedeLimite ? '#dc2626' : '#10b981'}`,
+                          fontSize: '14px',
+                        }}>
+                          <div style={{ 
+                            fontWeight: '600', 
+                            color: excedeLimite ? '#991b1b' : '#065f46',
+                            marginBottom: '4px' 
+                          }}>
+                            {excedeLimite ? '⚠️ Crédito insuficiente' : '✓ Crédito suficiente'}
+                          </div>
+                          <div style={{ color: excedeLimite ? '#7f1d1d' : '#047857' }}>
+                            Crédito disponible: ${formatCurrency(creditoDisponible)}<br/>
+                            Total de la venta: ${formatCurrency(totales.total)}
+
+                            {excedeLimite && (
+                              <>
+                                <br/>
+                                <span style={{ fontWeight: '600' }}>
+                                  Faltante: ${formatCurrency(totales.total - creditoDisponible)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
+
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUsarPagosMultiples(true);
+                      setPagos([{ forma_pago: 'efectivo', monto: '' }]);
+                    }}
+                    style={styles.switchButton}
+                  >
+                    Usar múltiples formas de pago
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsarPagosMultiples(false);
+                    setPagos([]);
+                  }}
+                  style={styles.switchButton}
+                >
+                  Usar una sola forma de pago
+                </button>
+              )}
             </div>
 
             <div style={styles.inputGroup}>
@@ -451,6 +572,8 @@ const VentaForm = () => {
             </div>
           </div>
         </div>
+
+        
 
         {/* Productos */}
         <div style={styles.section}>
@@ -652,6 +775,125 @@ const VentaForm = () => {
           </div>
         )}
 
+{/* Pagos Múltiples */}
+        {usarPagosMultiples && detalle.length > 0 && (
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>Formas de Pago</h2>
+            
+            {pagos.map((pago, index) => {
+              const creditoDisponible = selectedCliente 
+                ? selectedCliente.limite_credito - selectedCliente.saldo_cuenta_corriente
+                : 0;
+
+              return (
+                <div key={index} style={styles.pagoRow}>
+                  <div style={styles.pagoInputs}>
+                    <div style={styles.inputGroup}>
+                      <label style={styles.label}>Forma de Pago</label>
+                      <select
+                        value={pago.forma_pago}
+                        onChange={(e) => {
+                          const newPagos = [...pagos];
+                          newPagos[index].forma_pago = e.target.value;
+                          
+                          // Si cambia a cuenta corriente, sugerir el crédito disponible
+                          if (e.target.value === 'cuenta_corriente' && creditoDisponible > 0) {
+                            const montoPendiente = totales.total - pagos.reduce((sum, p, i) => 
+                              i !== index ? sum + (parseFloat(p.monto) || 0) : sum, 0
+                            );
+                            newPagos[index].monto = Math.min(creditoDisponible, montoPendiente).toFixed(2);
+                          }
+                          
+                          setPagos(newPagos);
+                        }}
+                        style={styles.select}
+                      >
+                        <option value="efectivo">Efectivo</option>
+                        <option value="tarjeta">Tarjeta</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="cheque">Cheque</option>
+                        <option value="cuenta_corriente">
+                          Cuenta Corriente {creditoDisponible > 0 && `(Disp: $${creditoDisponible.toFixed(2)})`}
+                        </option>
+                      </select>
+                    </div>
+
+                    <div style={styles.inputGroup}>
+                      <label style={styles.label}>Monto</label>
+                      <input
+                        type="number"
+                        value={pago.monto}
+                        onChange={(e) => {
+                          const newPagos = [...pagos];
+                          const nuevoMonto = parseFloat(e.target.value) || 0;
+                          
+                          // Validar límite de crédito si es cuenta corriente
+                          if (pago.forma_pago === 'cuenta_corriente' && nuevoMonto > creditoDisponible) {
+                            alert(`El monto supera el crédito disponible ($${creditoDisponible.toFixed(2)})`);
+                            return;
+                          }
+                          
+                          newPagos[index].monto = e.target.value;
+                          setPagos(newPagos);
+                        }}
+                        style={styles.input}
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setPagos(pagos.filter((_, i) => i !== index))}
+                    style={styles.removePagoButton}
+                    disabled={pagos.length === 1}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => setPagos([...pagos, { forma_pago: 'efectivo', monto: '' }])}
+              style={styles.addPagoButton}
+            >
+              <Plus size={16} style={{ marginRight: '6px' }} />
+              Agregar Forma de Pago
+            </button>
+
+            {/* Resumen de pagos */}
+            <div style={styles.resumenPagos}>
+              <div style={styles.resumenRow}>
+                <span>Total a pagar:</span>
+                <span style={{ fontWeight: 'bold' }}>
+                  {formatCurrency(totales.total, monedaActual?.simbolo)}
+                </span>
+              </div>
+              <div style={styles.resumenRow}>
+                <span>Total pagos:</span>
+                <span style={{ 
+                  fontWeight: 'bold',
+                  color: Math.abs(pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0) - totales.total) < 0.01 
+                    ? '#10b981' 
+                    : '#dc2626'
+                }}>
+                  {formatCurrency(pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0), monedaActual?.simbolo)}
+                </span>
+              </div>
+              <div style={styles.resumenRow}>
+                <span>Diferencia:</span>
+                <span style={{ fontWeight: 'bold', color: '#dc2626' }}>
+                  {formatCurrency(totales.total - pagos.reduce((sum, p) => sum + (parseFloat(p.monto) || 0), 0), monedaActual?.simbolo)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Observaciones */}
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Observaciones</h2>
@@ -1038,6 +1280,67 @@ const styles = {
     transition: 'all 0.2s',
     display: 'flex',
     alignItems: 'center',
+  },
+  switchButton: {
+    marginTop: '8px',
+    padding: '8px 16px',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#2563eb',
+    backgroundColor: '#eff6ff',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+  },
+  pagoRow: {
+    display: 'flex',
+    gap: '15px',
+    marginBottom: '15px',
+    padding: '15px',
+    backgroundColor: '#f9fafb',
+    borderRadius: '8px',
+    alignItems: 'flex-end',
+  },
+  pagoInputs: {
+    flex: 1,
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '15px',
+  },
+  removePagoButton: {
+    padding: '10px',
+    color: '#dc2626',
+    backgroundColor: '#fee2e2',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  addPagoButton: {
+    padding: '10px 20px',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#10b981',
+    backgroundColor: '#d1fae5',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '20px',
+  },
+  resumenPagos: {
+    marginTop: '20px',
+    padding: '20px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    border: '2px solid #e5e7eb',
+  },
+  resumenRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '8px 0',
+    fontSize: '15px',
   },
 };
 

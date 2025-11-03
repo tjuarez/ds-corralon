@@ -21,6 +21,25 @@ import VentaDetalle from '../pages/VentaDetalle';
 import Compras from '../pages/Compras';
 import CompraForm from '../pages/CompraForm';
 import CompraDetalle from '../pages/CompraDetalle';
+import CuentaCorriente from '../pages/CuentaCorriente';
+import EstadoCuenta from '../pages/EstadoCuenta';
+import RegistrarPago from '../pages/RegistrarPago';
+import Caja from '../pages/Caja';
+import AbrirCaja from '../pages/AbrirCaja';
+import CajaDetalle from '../pages/CajaDetalle';
+import RegistrarMovimientoCaja from '../pages/RegistrarMovimientoCaja';
+import CerrarCaja from '../pages/CerrarCaja';
+import Reportes from '../pages/Reportes';
+import ReporteVentas from '../pages/ReporteVentas';
+import ReporteProductos from '../pages/ReporteProductos';
+import ReporteStock from '../pages/ReporteStock';
+import ReporteClientes from '../pages/ReporteClientes';
+import ReporteCaja from '../pages/ReporteCaja';
+import ReporteRentabilidad from '../pages/ReporteRentabilidad';
+import Sucursales from '../pages/Sucursales';
+import SucursalForm from '../pages/SucursalForm';
+import Usuarios from '../pages/Usuarios';
+import UsuarioForm from '../pages/UsuarioForm';
 
 const AppRoutes = () => {
   return (
@@ -157,6 +176,32 @@ const AppRoutes = () => {
       <Route path="/compras" element={<Compras />} />
       <Route path="/compras/nueva" element={<CompraForm />} />
       <Route path="/compras/:id" element={<CompraDetalle />} />
+
+      <Route path="/cuenta-corriente" element={<CuentaCorriente />} />
+      <Route path="/cuenta-corriente/:clienteId" element={<EstadoCuenta />} />
+      <Route path="/cuenta-corriente/:clienteId/pago" element={<RegistrarPago />} />
+
+      <Route path="/caja" element={<Caja />} />
+      <Route path="/caja/abrir" element={<AbrirCaja />} />
+      <Route path="/caja/:id" element={<CajaDetalle />} />
+      <Route path="/caja/:id/movimiento" element={<RegistrarMovimientoCaja />} />
+      <Route path="/caja/:id/cerrar" element={<CerrarCaja />} />
+
+      <Route path="/reportes" element={<Reportes />} />
+      <Route path="/reportes/ventas" element={<ReporteVentas />} />
+      <Route path="/reportes/productos" element={<ReporteProductos />} />
+      <Route path="/reportes/stock" element={<ReporteStock />} />
+      <Route path="/reportes/clientes" element={<ReporteClientes />} />
+      <Route path="/reportes/caja" element={<ReporteCaja />} />
+      <Route path="/reportes/rentabilidad" element={<ReporteRentabilidad />} />
+
+      <Route path="/sucursales" element={<Sucursales />} />
+      <Route path="/sucursales/nueva" element={<SucursalForm />} />
+      <Route path="/sucursales/:id/editar" element={<SucursalForm />} />
+
+      <Route path="/usuarios" element={<Usuarios />} />
+      <Route path="/usuarios/nuevo" element={<UsuarioForm />} />
+      <Route path="/usuarios/:id/editar" element={<UsuarioForm />} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

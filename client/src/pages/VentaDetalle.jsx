@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrency } from '../utils/formatters';
 import { ventasApi } from '../api/ventas';
 import Layout from '../components/Layout';
 import {
@@ -321,6 +322,82 @@ const VentaDetalle = () => {
           </div>
         </div>
 
+        {/* Formas de Pago (si hay múltiples) */}
+        {venta.pagos && venta.pagos.length > 0 && (
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>Formas de Pago</h2>
+            <div style={styles.tableContainer}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Forma de Pago</th>
+                    <th style={styles.thRight}>Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {venta.pagos.map((pago, index) => {
+                    const formasPago = {
+                      'efectivo': 'Efectivo',
+                      'tarjeta': 'Tarjeta',
+                      'transferencia': 'Transferencia',
+                      'cheque': 'Cheque',
+                      'cuenta_corriente': 'Cuenta Corriente'
+                    };
+                    
+                    return (
+                      <tr key={index} style={styles.tr}>
+                        <td style={styles.td}>{formasPago[pago.forma_pago] || pago.forma_pago}</td>
+                        <td style={styles.tdRight}>
+                          {formatCurrency(pago.monto, venta.moneda_simbolo)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={styles.trTotal}>
+                    <td style={{ ...styles.td, fontWeight: 'bold' }}>Total:</td>
+                    <td style={{ ...styles.tdRight, fontWeight: 'bold' }}>
+                      {formatCurrency(
+                        venta.pagos.reduce((sum, p) => sum + parseFloat(p.monto), 0),
+                        venta.moneda_simbolo
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+
+
+        {/* Indicador de registro en caja */}
+        {venta.pagos && venta.pagos.some(p => p.forma_pago === 'efectivo') && (
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#d1fae5',
+            border: '2px solid #10b981',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '30px',
+          }}>
+            <DollarSign size={20} color="#065f46" />
+            <div>
+              <div style={{ fontWeight: '600', color: '#065f46' }}>
+                Pago en efectivo registrado en caja
+              </div>
+              <div style={{ fontSize: '14px', color: '#047857' }}>
+                {venta.estado === 'anulada' 
+                  ? 'El movimiento fue revertido al anular la venta'
+                  : 'Este pago se registró automáticamente como ingreso en la caja del vendedor'
+                }
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Totales */}
         <div style={styles.section}>
           <div style={styles.totalesBox}>
@@ -636,6 +713,10 @@ const styles = {
     lineHeight: '1.6',
     margin: 0,
     whiteSpace: 'pre-wrap',
+  },
+  trTotal: {
+    borderTop: '2px solid #1f2937',
+    backgroundColor: '#f9fafb',
   },
 };
 

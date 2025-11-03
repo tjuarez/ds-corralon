@@ -38,16 +38,30 @@ const Layout = ({ children }) => {
   };
 
   const menuItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: t('dashboard') },
+    { path: '/dashboard', icon: BarChart3, label: t('dashboard') },
     { path: '/clientes', icon: Users, label: t('clients') },
     { path: '/productos', icon: Package, label: t('products') },
     { path: '/proveedores', icon: Truck, label: t('providers') },
     { path: '/ventas', icon: ShoppingCart, label: t('sales') },
     { path: '/presupuestos', icon: FileText, label: t('quotes') },
-    { path: '/compras', icon: ShoppingBag, label: t('purchases') },
-    { path: '/caja', icon: DollarSign, label: t('cashRegister') },
-    { path: '/reportes', icon: BarChart3, label: t('reports') },
+    { path: '/compras', icon: ShoppingBag, label: t('purchases') }
   ];
+
+  if (user?.rol === 'admin' || user?.rol === 'vendedor' || user?.rol === 'cajero') {
+    menuItems.push(
+      { path: '/cuenta-corriente', icon: DollarSign, label: t('currentAccount') }
+    );
+  }
+
+  if (user?.rol === 'admin' || user?.rol === 'cajero') {
+    menuItems.push(
+      { path: '/caja', icon: DollarSign, label: t('cashRegister') }
+    );
+  }
+
+  menuItems.push(
+    { path: '/reportes', icon: BarChart3, label: t('reports') }
+  );
 
   // Solo admins pueden ver configuración y usuarios
   if (user?.rol === 'admin') {

@@ -4,12 +4,17 @@ const migrations = [
   // 1. Tabla de sucursales
   `CREATE TABLE IF NOT EXISTS sucursales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL,
+    codigo VARCHAR(20) UNIQUE NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
     direccion TEXT,
-    telefono TEXT,
-    email TEXT,
-    codigo TEXT UNIQUE,
-    activa INTEGER DEFAULT 1,
+    pais VARCHAR(100),
+    provincia VARCHAR(100),
+    ciudad VARCHAR(100),
+    codigo_postal VARCHAR(10),
+    telefono VARCHAR(50),
+    email VARCHAR(100),
+    responsable VARCHAR(100),
+    activa BOOLEAN DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -76,13 +81,15 @@ const migrations = [
     localidad TEXT,
     provincia TEXT,
     codigo_postal TEXT,
-    limite_credito REAL DEFAULT 0,
     condicion_pago TEXT DEFAULT 'contado',
     lista_precio_id INTEGER,
     nivel_fidelizacion TEXT DEFAULT 'bronce' CHECK(nivel_fidelizacion IN ('bronce', 'plata', 'oro')),
     puntos_fidelizacion INTEGER DEFAULT 0,
     observaciones TEXT,
     activo INTEGER DEFAULT 1,
+    limite_credito DECIMAL(10, 2) DEFAULT 0,
+    saldo_cuenta_corriente DECIMAL(10, 2) DEFAULT 0,
+    dias_vencimiento_cc INTEGER DEFAULT 30,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -313,23 +320,36 @@ const migrations = [
     FOREIGN KEY (producto_id) REFERENCES productos(id)
   )`,
 
+  // Tabla de pagos de ventas (para pagos mixtos)
+  `CREATE TABLE IF NOT EXISTS ventas_pagos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    venta_id INTEGER NOT NULL,
+    forma_pago VARCHAR(20) NOT NULL,
+    monto DECIMAL(10, 2) NOT NULL,
+    observaciones TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE
+  )`,
+
   // 19. Tabla de cuenta corriente
   `CREATE TABLE IF NOT EXISTS cuenta_corriente (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cliente_id INTEGER NOT NULL,
-    tipo_movimiento TEXT NOT NULL CHECK(tipo_movimiento IN ('debe', 'haber')),
+    tipo_movimiento VARCHAR(20) NOT NULL,
+    monto DECIMAL(10, 2) NOT NULL,
+    saldo_anterior DECIMAL(10, 2) NOT NULL,
+    saldo_nuevo DECIMAL(10, 2) NOT NULL,
     concepto TEXT NOT NULL,
-    monto REAL NOT NULL,
-    moneda_id INTEGER NOT NULL,
-    fecha DATE NOT NULL,
     venta_id INTEGER,
-    pago_id INTEGER,
-    saldo REAL NOT NULL,
+    fecha DATE NOT NULL,
+    fecha_vencimiento DATE,
+    medio_pago VARCHAR(20),
+    numero_comprobante VARCHAR(50),
     observaciones TEXT,
     usuario_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (cliente_id) REFERENCES clientes(id),
-    FOREIGN KEY (moneda_id) REFERENCES monedas(id),
     FOREIGN KEY (venta_id) REFERENCES ventas(id),
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
   )`,
@@ -356,36 +376,43 @@ const migrations = [
   // 21. Tabla de cajas
   `CREATE TABLE IF NOT EXISTS cajas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sucursal_id INTEGER NOT NULL,
-    usuario_id INTEGER NOT NULL,
+    numero INTEGER NOT NULL,
     fecha_apertura DATETIME NOT NULL,
     fecha_cierre DATETIME,
-    monto_inicial REAL NOT NULL,
-    monto_final REAL,
-    monto_esperado REAL,
-    diferencia REAL,
-    estado TEXT DEFAULT 'abierta' CHECK(estado IN ('abierta', 'cerrada')),
-    observaciones TEXT,
+    usuario_apertura_id INTEGER NOT NULL,
+    usuario_cierre_id INTEGER,
+    monto_inicial DECIMAL(10, 2) NOT NULL,
+    monto_final DECIMAL(10, 2),
+    total_ingresos DECIMAL(10, 2) DEFAULT 0,
+    total_egresos DECIMAL(10, 2) DEFAULT 0,
+    monto_esperado DECIMAL(10, 2),
+    diferencia DECIMAL(10, 2),
+    estado VARCHAR(20) DEFAULT 'abierta',
+    observaciones_apertura TEXT,
+    observaciones_cierre TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario_apertura_id) REFERENCES usuarios(id),
+    FOREIGN KEY (usuario_cierre_id) REFERENCES usuarios(id)
   )`,
 
   // 22. Tabla de movimientos de caja
   `CREATE TABLE IF NOT EXISTS movimientos_caja (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     caja_id INTEGER NOT NULL,
-    tipo_movimiento TEXT NOT NULL CHECK(tipo_movimiento IN ('ingreso', 'egreso')),
+    tipo_movimiento VARCHAR(20) NOT NULL,
+    categoria VARCHAR(50),
+    monto DECIMAL(10, 2) NOT NULL,
     concepto TEXT NOT NULL,
-    monto REAL NOT NULL,
-    moneda_id INTEGER NOT NULL,
-    forma_pago TEXT,
     venta_id INTEGER,
-    observaciones TEXT,
+    pago_cc_id INTEGER,
+    numero_comprobante VARCHAR(50),
+    usuario_id INTEGER,
     fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+    observaciones TEXT,
     FOREIGN KEY (caja_id) REFERENCES cajas(id) ON DELETE CASCADE,
-    FOREIGN KEY (moneda_id) REFERENCES monedas(id),
-    FOREIGN KEY (venta_id) REFERENCES ventas(id)
+    FOREIGN KEY (venta_id) REFERENCES ventas(id),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
   )`,
 
   // 23. Tabla de movimientos de stock
@@ -445,19 +472,71 @@ const seedData = async () => {
 
     // 3. Insertar sucursal principal
     await runQuery(`
-      INSERT OR IGNORE INTO sucursales (nombre, codigo, activa) VALUES
-      ('Sucursal Principal', 'PRINCIPAL', 1)
+      INSERT OR IGNORE INTO sucursales (codigo, nombre, direccion, pais, provincia, ciudad, activa)
+      VALUES ('CASA-CENTRAL', 'Casa Central', 'Av. Principal 123', 'Argentina', 'Buenos Aires', 'Lomas de Zamora', 1)
     `);
 
     // 4. Insertar usuario administrador por defecto
     // Contraseña: admin123 (deberá cambiarla en el primer login)
     const bcrypt = await import('bcrypt');
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    //const hashedPassword = await bcrypt.hash('admin123', 10);
     
-    await runQuery(`
-      INSERT OR IGNORE INTO usuarios (username, password, nombre, apellido, email, rol, sucursal_id, activo) VALUES
-      ('admin', ?, 'Administrador', 'Sistema', 'admin@corralon.com', 'admin', 1, 1)
-    `, [hashedPassword]);
+    // Usuarios por defecto
+    const usuarios = [
+      {
+        username: 'admin',
+        nombre: 'Admin',
+        apellido: 'Sistema',
+        email: 'admin@corralon.com',
+        password: bcrypt.hashSync('admin123', 10),
+        rol: 'admin',
+        sucursal_id: 1,
+      },
+      {
+        username: 'vendedor1',
+        nombre: 'Juan',
+        apellido: 'Pérez',
+        email: 'juan.perez@corralon.com',
+        password: bcrypt.hashSync('vendedor123', 10),
+        rol: 'vendedor',
+        sucursal_id: 1,
+      },
+      {
+        username: 'vendedor2',
+        nombre: 'Ana',
+        apellido: 'Martínez',
+        email: 'ana.martinez@corralon.com',
+        password: bcrypt.hashSync('vendedor123', 10),
+        rol: 'vendedor',
+        sucursal_id: 1,
+      },
+      {
+        username: 'cajero1',
+        nombre: 'María',
+        apellido: 'González',
+        email: 'maria.gonzalez@corralon.com',
+        password: bcrypt.hashSync('cajero123', 10),
+        rol: 'cajero',
+        sucursal_id: 1,
+      },
+      {
+        username: 'cajero2',
+        nombre: 'Carlos',
+        apellido: 'Rodríguez',
+        email: 'carlos.rodriguez@corralon.com',
+        password: bcrypt.hashSync('cajero123', 10),
+        rol: 'cajero',
+        sucursal_id: 1,
+      },
+    ];
+
+    for (const usuario of usuarios) {
+      await runQuery(`
+        INSERT OR IGNORE INTO usuarios (username, nombre, apellido, email, password, rol, sucursal_id, activo)
+        VALUES ('${usuario.username}', '${usuario.nombre}', '${usuario.apellido}', '${usuario.email}', '${usuario.password}', '${usuario.rol}', ${usuario.sucursal_id}, 1)
+      `);
+    }
+
 
     // 5. Insertar configuración básica
     await runQuery(`

@@ -4,13 +4,15 @@
  * @param {string} currency - Símbolo de moneda (opcional)
  * @returns {string} - Número formateado
  */
-export const formatCurrency = (amount, currency = '') => {
-  const formatted = parseFloat(amount).toLocaleString('es-AR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+export const formatCurrency = (value, symbol = '$') => {
+  // Validar que value sea un número válido
+  const numValue = parseFloat(value);
   
-  return currency ? `${currency} ${formatted}` : formatted;
+  if (isNaN(numValue) || numValue === null || numValue === undefined) {
+    return `${symbol}0.00`;
+  }
+
+  return `${symbol}${numValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 };
 
 /**
