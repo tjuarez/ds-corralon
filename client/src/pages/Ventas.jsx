@@ -1,39 +1,66 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { ventasApi } from '../api/ventas';
+import { sucursalesApi } from '../api/sucursales';
 import Layout from '../components/Layout';
-import { Plus, Search, Eye, DollarSign, Calendar, User, FileText, XCircle, CheckCircle } from 'lucide-react';
+import { Plus, Search, Eye, DollarSign, Calendar, User, FileText, XCircle, CheckCircle, Building2 } from 'lucide-react';
 
 const Ventas = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const { showError } = useNotification();
   
   const [ventas, setVentas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [sucursales, setSucursales] = useState([]);
+  const [filtroSucursal, setFiltroSucursal] = useState('');
 
   useEffect(() => {
     loadVentas();
-  }, [search]);
+    if (user?.rol === 'admin') {
+      loadSucursales();
+    }
+  }, []);
 
   const loadVentas = async () => {
     try {
       setLoading(true);
-      const filters = {};
-      if (search) filters.search = search;
-      
-      const data = await ventasApi.getAll(filters);
+      const filtros = {};
+
+      // Admin puede filtrar por sucursal
+      if (user?.rol === 'admin' && filtroSucursal) {
+        filtros.sucursal_id = filtroSucursal;
+      }
+
+      const data = await ventasApi.getAll(filtros);
       setVentas(data.ventas);
     } catch (error) {
-      console.error('Error al cargar ventas:', error);
       showError(error.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const loadSucursales = async () => {
+    try {
+      const data = await sucursalesApi.getAll({ activa: 'true' });
+      setSucursales(data.sucursales);
+    } catch (error) {
+      console.error('Error al cargar sucursales:', error);
+    }
+  };
+
+  // Aplicar filtro cuando cambia
+  useEffect(() => {
+    if (user) {
+      loadVentas();
+    }
+  }, [filtroSucursal]);
 
   const getEstadoBadge = (estado) => {
     if (estado === 'completada') {
@@ -69,10 +96,21 @@ const Ventas = () => {
       'efectivo': 'Efectivo',
       'tarjeta': 'Tarjeta',
       'transferencia': 'Transferencia',
-      'cuenta_corriente': 'Cuenta Corriente'
+      'cuenta_corriente': 'Cuenta Corriente',
+      'multiple': 'Múltiple'
     };
     return formas[forma] || forma;
   };
+
+  // Filtrar ventas por búsqueda
+  const ventasFiltradas = ventas.filter(venta => {
+    const searchLower = search.toLowerCase();
+    return (
+      venta.numero_comprobante.toLowerCase().includes(searchLower) ||
+      (venta.cliente_nombre && venta.cliente_nombre.toLowerCase().includes(searchLower)) ||
+      (venta.sucursal_nombre && venta.sucursal_nombre.toLowerCase().includes(searchLower))
+    );
+  });
 
   return (
     <Layout>
@@ -80,7 +118,10 @@ const Ventas = () => {
         <div>
           <h1 style={styles.title}>{t('sales')}</h1>
           <p style={styles.subtitle}>
-            {ventas.length} {ventas.length === 1 ? 'venta registrada' : 'ventas registradas'}
+            {ventasFiltradas.length} {ventasFiltradas.length === 1 ? 'venta registrada' : 'ventas registradas'}
+            {user?.rol !== 'admin' && user?.sucursal_nombre && (
+              <span style={styles.sucursalInfo}> • {user.sucursal_nombre}</span>
+            )}
           </p>
         </div>
         <button
@@ -98,12 +139,30 @@ const Ventas = () => {
           <Search size={18} style={styles.searchIcon} />
           <input
             type="text"
-            placeholder={`${t('search')}...`}
+            placeholder={`${t('search')} por número, cliente o sucursal...`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={styles.searchInput}
           />
         </div>
+
+        {/* Filtro de Sucursal - Solo para Admin */}
+        {user?.rol === 'admin' && (
+          <div style={styles.filterGroup}>
+            <select
+              value={filtroSucursal}
+              onChange={(e) => setFiltroSucursal(e.target.value)}
+              style={styles.select}
+            >
+              <option value="">Todas las sucursales</option>
+              {sucursales.map(sucursal => (
+                <option key={sucursal.id} value={sucursal.id}>
+                  {sucursal.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Lista de ventas */}
@@ -112,20 +171,24 @@ const Ventas = () => {
           <div style={styles.spinner}></div>
           <p>{t('loading')}</p>
         </div>
-      ) : ventas.length === 0 ? (
+      ) : ventasFiltradas.length === 0 ? (
         <div style={styles.noData}>
           <FileText size={48} color="#9ca3af" />
-          <p style={styles.noDataText}>{t('noData')}</p>
-          <button
-            onClick={() => navigate('/ventas/nueva')}
-            style={styles.addButtonSecondary}
-          >
-            Crear primera venta
-          </button>
+          <p style={styles.noDataText}>
+            {search || filtroSucursal ? 'No se encontraron ventas con los filtros aplicados' : t('noData')}
+          </p>
+          {!search && !filtroSucursal && (
+            <button
+              onClick={() => navigate('/ventas/nueva')}
+              style={styles.addButtonSecondary}
+            >
+              Crear primera venta
+            </button>
+          )}
         </div>
       ) : (
         <div style={styles.grid}>
-          {ventas.map((venta) => (
+          {ventasFiltradas.map((venta) => (
             <div key={venta.id} style={styles.card}>
               <div style={styles.cardHeader}>
                 <div>
@@ -137,6 +200,14 @@ const Ventas = () => {
               </div>
 
               <div style={styles.cardBody}>
+                {/* Sucursal */}
+                <div style={styles.infoRow}>
+                  <Building2 size={16} style={styles.infoIcon} />
+                  <span style={styles.sucursalBadge}>
+                    {venta.sucursal_nombre || 'Sin asignar'}
+                  </span>
+                </div>
+
                 <div style={styles.infoRow}>
                   <Calendar size={16} style={styles.infoIcon} />
                   <span style={styles.infoValue}>
@@ -202,6 +273,10 @@ const styles = {
     color: '#6b7280',
     margin: 0,
   },
+  sucursalInfo: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
   addButton: {
     padding: '12px 24px',
     fontSize: '16px',
@@ -250,6 +325,19 @@ const styles = {
     border: '2px solid #e5e7eb',
     borderRadius: '8px',
     outline: 'none',
+  },
+  filterGroup: {
+    minWidth: '200px',
+  },
+  select: {
+    width: '100%',
+    padding: '12px 16px',
+    fontSize: '15px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    outline: 'none',
+    backgroundColor: 'white',
+    cursor: 'pointer',
   },
   loading: {
     display: 'flex',
@@ -358,6 +446,14 @@ const styles = {
   },
   infoValue: {
     color: '#4b5563',
+  },
+  sucursalBadge: {
+    padding: '4px 12px',
+    backgroundColor: '#dbeafe',
+    color: '#1e40af',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontWeight: '600',
   },
   cardFooter: {
     display: 'flex',

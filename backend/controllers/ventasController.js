@@ -3,53 +3,70 @@ import { getAll, getOne, runQuery } from '../db/database.js';
 // Obtener todas las ventas (con búsqueda y filtros)
 export const getVentas = async (req, res) => {
   try {
-    const { search, fecha_desde, fecha_hasta, cliente_id, forma_pago } = req.query;
+    const { fecha_desde, fecha_hasta, cliente_id, forma_pago, estado, sucursal_id } = req.query;
+    const user = req.user;
 
     let sql = `
-      SELECT v.*, 
-             c.razon_social as cliente_nombre,
-             c.tipo_cliente,
-             m.codigo as moneda_codigo,
-             m.simbolo as moneda_simbolo,
-             u.nombre || ' ' || u.apellido as usuario_nombre
+      SELECT 
+        v.*,
+        c.razon_social as cliente_nombre,
+        c.tipo_cliente,
+        u.nombre as usuario_nombre,
+        u.apellido as usuario_apellido,
+        s.nombre as sucursal_nombre
       FROM ventas v
       LEFT JOIN clientes c ON v.cliente_id = c.id
-      LEFT JOIN monedas m ON v.moneda_id = m.id
       LEFT JOIN usuarios u ON v.usuario_id = u.id
+      LEFT JOIN sucursales s ON v.sucursal_id = s.id
       WHERE 1=1
     `;
     const params = [];
 
-    // Búsqueda por número o cliente
-    if (search) {
-      sql += ` AND (v.numero_comprobante LIKE ? OR c.razon_social LIKE ?)`;
-      const searchParam = `%${search}%`;
-      params.push(searchParam, searchParam);
+    // FILTRO CRÍTICO: Control por sucursal
+    if (user.rol !== 'admin') {
+      // No-admin: SOLO puede ver ventas de su sucursal
+      if (!user.sucursal_id) {
+        return res.status(400).json({ 
+          error: 'Usuario no tiene sucursal asignada' 
+        });
+      }
+      sql += ' AND v.sucursal_id = ?';
+      params.push(user.sucursal_id);
+    } else {
+      // Admin: puede filtrar por sucursal específica o ver todas
+      if (sucursal_id) {
+        sql += ' AND v.sucursal_id = ?';
+        params.push(sucursal_id);
+      }
     }
 
-    // Filtro por fecha
+    // Resto de filtros
     if (fecha_desde) {
-      sql += ` AND v.fecha >= ?`;
+      sql += ' AND v.fecha >= ?';
       params.push(fecha_desde);
     }
+
     if (fecha_hasta) {
-      sql += ` AND v.fecha <= ?`;
+      sql += ' AND v.fecha <= ?';
       params.push(fecha_hasta);
     }
 
-    // Filtro por cliente
     if (cliente_id) {
-      sql += ` AND v.cliente_id = ?`;
+      sql += ' AND v.cliente_id = ?';
       params.push(cliente_id);
     }
 
-    // Filtro por forma de pago
     if (forma_pago) {
-      sql += ` AND v.forma_pago = ?`;
+      sql += ' AND v.forma_pago = ?';
       params.push(forma_pago);
     }
 
-    sql += ` ORDER BY v.fecha DESC, v.numero_comprobante DESC`;
+    if (estado) {
+      sql += ' AND v.estado = ?';
+      params.push(estado);
+    }
+
+    sql += ' ORDER BY v.fecha DESC, v.id DESC';
 
     const ventas = await getAll(sql, params);
     res.json({ ventas });
@@ -158,6 +175,15 @@ export const createVenta = async (req, res) => {
       presupuesto_id
     } = req.body;
 
+    const user = req.user;
+
+    // ========== VALIDACIÓN CRÍTICA: Usuario debe tener sucursal ==========
+    if (!user.sucursal_id) {
+      return res.status(400).json({
+        error: 'No puedes crear ventas sin tener una sucursal asignada. Contacte al administrador.'
+      });
+    }
+
     // Validaciones
     if (!cliente_id || !fecha || !moneda_id || !detalle || detalle.length === 0) {
       return res.status(400).json({ 
@@ -223,18 +249,18 @@ export const createVenta = async (req, res) => {
     // Generar número de comprobante
     const numero_comprobante = await generateNumeroComprobante(tipo_comprobante);
 
-    // Insertar venta (forma_pago puede ser null si hay múltiples pagos)
+    // ========== INSERTAR VENTA CON SUCURSAL_ID ==========
     const formaPagoVenta = forma_pago || 'multiple';
     const result = await runQuery(`
       INSERT INTO ventas (
         numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
         subtotal, descuento_porcentaje, descuento_monto, impuestos, total,
-        forma_pago, estado, observaciones, presupuesto_id, usuario_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?)
+        forma_pago, estado, observaciones, presupuesto_id, usuario_id, sucursal_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?, ?)
     `, [
       numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
       subtotal, descuento_porcentaje || 0, descuentoMonto, 0, total,
-      formaPagoVenta, observaciones, presupuesto_id, usuario_id
+      formaPagoVenta, observaciones, presupuesto_id, usuario_id, user.sucursal_id
     ]);
 
     const ventaId = result.id;
@@ -290,7 +316,6 @@ export const createVenta = async (req, res) => {
         [presupuesto_id]
       );
     }
-
 
     // Procesar pagos
     const pagosList = pagos && pagos.length > 0 ? pagos : [{ forma_pago: forma_pago, monto: total }];
@@ -364,7 +389,6 @@ export const createVenta = async (req, res) => {
       }
     }
 
-
     res.status(201).json({
       message: 'Venta creada exitosamente',
       ventaId,
@@ -427,34 +451,6 @@ export const anularVenta = async (req, res) => {
       ]);
     }
 
-    // Si la venta fue con cuenta corriente (forma de pago única), revertir
-    /*if (venta.forma_pago === 'cuenta_corriente') {
-      const cliente = await getOne(
-        'SELECT id, razon_social, saldo_cuenta_corriente FROM clientes WHERE id = ?',
-        [venta.cliente_id]
-      );
-
-      const saldoAnterior = cliente.saldo_cuenta_corriente;
-      const saldoNuevo = saldoAnterior - venta.total;
-
-      // Registrar movimiento de crédito (reversión)
-      await runQuery(`
-        INSERT INTO cuenta_corriente (
-          cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
-          concepto, venta_id, fecha, usuario_id
-        ) VALUES (?, 'credito', ?, ?, ?, ?, ?, CURRENT_DATE, ?)
-      `, [
-        venta.cliente_id, venta.total, saldoAnterior, saldoNuevo,
-        `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
-      ]);
-
-      // Actualizar saldo del cliente
-      await runQuery(
-        'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
-        [saldoNuevo, venta.cliente_id]
-      );
-    }*/
-
     // Revertir pagos en cuenta corriente
     const pagosCC = await getAll(
       'SELECT * FROM ventas_pagos WHERE venta_id = ? AND forma_pago = ?',
@@ -487,7 +483,6 @@ export const anularVenta = async (req, res) => {
         [saldoNuevo, venta.cliente_id]
       );
     }
-
 
     // Revertir pagos en efectivo de la caja
     const pagosEfectivo = await getAll(

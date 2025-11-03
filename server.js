@@ -19,6 +19,7 @@ import cuentaCorrienteRoutes from './backend/routes/cuentaCorriente.js';
 import cajaRoutes from './backend/routes/caja.js';
 import reportesRoutes from './backend/routes/reportes.js';
 import sucursalesRoutes from './backend/routes/sucursales.js';
+import usuariosRoutes from './backend/routes/usuarios.js';
 
 // Configuración de variables de entorno
 dotenv.config();
@@ -63,6 +64,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/caja', cajaRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/sucursales', sucursalesRoutes);
+app.use('/api/usuarios', usuariosRoutes);
 
 // En producción, servir el frontend compilado
 if (process.env.NODE_ENV === 'production') {

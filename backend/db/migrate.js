@@ -215,11 +215,13 @@ const migrations = [
     estado VARCHAR(20) DEFAULT 'pendiente',
     observaciones TEXT,
     usuario_id INTEGER,
+    sucursal_id INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (proveedor_id) REFERENCES proveedores(id),
     FOREIGN KEY (moneda_id) REFERENCES monedas(id),
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
   )`,
 
   // 14. Tabla de detalle de compras
@@ -381,6 +383,7 @@ const migrations = [
     fecha_cierre DATETIME,
     usuario_apertura_id INTEGER NOT NULL,
     usuario_cierre_id INTEGER,
+    sucursal_id INTEGER NOT NULL,
     monto_inicial DECIMAL(10, 2) NOT NULL,
     monto_final DECIMAL(10, 2),
     total_ingresos DECIMAL(10, 2) DEFAULT 0,
@@ -393,7 +396,8 @@ const migrations = [
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (usuario_apertura_id) REFERENCES usuarios(id),
-    FOREIGN KEY (usuario_cierre_id) REFERENCES usuarios(id)
+    FOREIGN KEY (usuario_cierre_id) REFERENCES usuarios(id),
+    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
   )`,
 
   // 22. Tabla de movimientos de caja
@@ -434,6 +438,19 @@ const migrations = [
     FOREIGN KEY (venta_id) REFERENCES ventas(id),
     FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+  )`,
+
+  // 23.5. Tabla de stock por sucursal
+  `CREATE TABLE IF NOT EXISTS stock_sucursales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    producto_id INTEGER NOT NULL,
+    sucursal_id INTEGER NOT NULL,
+    cantidad DECIMAL(10,2) DEFAULT 0,
+    stock_minimo DECIMAL(10,2) DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (producto_id) REFERENCES productos(id),
+    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
+    UNIQUE(producto_id, sucursal_id)
   )`,
 
   // 24. Tabla de historial de fidelización
