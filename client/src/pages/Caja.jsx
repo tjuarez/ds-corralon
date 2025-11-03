@@ -4,9 +4,10 @@ import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import { cajaApi } from '../api/caja';
+import { sucursalesApi } from '../api/sucursales';
 import { formatCurrency } from '../utils/formatters';
 import Layout from '../components/Layout';
-import { Plus, Eye, Calendar, User, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, Activity } from 'lucide-react';
+import { Plus, Eye, Calendar, User, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, Activity, Building2 } from 'lucide-react';
 
 const Caja = () => {
   const navigate = useNavigate();
@@ -17,17 +18,28 @@ const Caja = () => {
   const [cajas, setCajas] = useState([]);
   const [cajaAbierta, setCajaAbierta] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sucursales, setSucursales] = useState([]);
+  const [filtroSucursal, setFiltroSucursal] = useState('');
 
   useEffect(() => {
     loadData();
+    if (user?.rol === 'admin') {
+      loadSucursales();
+    }
   }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
+
+      const filters = {};
+      // Admin puede filtrar por sucursal
+      if (user?.rol === 'admin' && filtroSucursal) {
+        filters.sucursal_id = filtroSucursal;
+      }
       
       const [cajasData, cajaAbiertaData] = await Promise.all([
-        cajaApi.getAll(),
+        cajaApi.getAll(filters),
         cajaApi.getCajaAbierta(user.id)
       ]);
 
@@ -40,6 +52,22 @@ const Caja = () => {
       setLoading(false);
     }
   };
+
+  const loadSucursales = async () => {
+    try {
+      const data = await sucursalesApi.getAll({ activa: 'true' });
+      setSucursales(data.sucursales);
+    } catch (error) {
+      console.error('Error al cargar sucursales:', error);
+    }
+  };
+
+  // Aplicar filtro cuando cambia
+  useEffect(() => {
+    if (user) {
+      loadData();
+    }
+  }, [filtroSucursal]);
 
   const getEstadoBadge = (estado) => {
     const estados = {
@@ -73,7 +101,12 @@ const Caja = () => {
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>{t('cashRegister')}</h1>
-          <p style={styles.subtitle}>Gestión de caja y movimientos diarios</p>
+          <p style={styles.subtitle}>
+            Gestión de caja y movimientos diarios
+            {user?.rol !== 'admin' && user?.sucursal_nombre && (
+              <span style={styles.sucursalInfo}> • {user.sucursal_nombre}</span>
+            )}
+          </p>
         </div>
         {!cajaAbierta && (
           <button
@@ -94,6 +127,9 @@ const Caja = () => {
               <h2 style={styles.cajaActivaTitle}>Caja N° {cajaAbierta.numero}</h2>
               <p style={styles.cajaActivaSubtitle}>
                 Abierta el {new Date(cajaAbierta.fecha_apertura).toLocaleString('es-AR')}
+                {cajaAbierta.sucursal_nombre && (
+                  <> • <span style={styles.sucursalBadgeInline}>{cajaAbierta.sucursal_nombre}</span></>
+                )}
               </p>
             </div>
             {getEstadoBadge(cajaAbierta.estado)}
@@ -162,6 +198,25 @@ const Caja = () => {
         </div>
       )}
 
+      {/* Filtro de Sucursal - Solo para Admin */}
+      {user?.rol === 'admin' && (
+        <div style={styles.filterBox}>
+          <label style={styles.filterLabel}>Filtrar por sucursal:</label>
+          <select
+            value={filtroSucursal}
+            onChange={(e) => setFiltroSucursal(e.target.value)}
+            style={styles.select}
+          >
+            <option value="">Todas las sucursales</option>
+            {sucursales.map(sucursal => (
+              <option key={sucursal.id} value={sucursal.id}>
+                {sucursal.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Historial de Cajas */}
       <div style={styles.section}>
         <h2 style={styles.sectionTitle}>Historial de Cajas</h2>
@@ -174,7 +229,9 @@ const Caja = () => {
         ) : cajas.length === 0 ? (
           <div style={styles.noData}>
             <Activity size={48} color="#9ca3af" />
-            <p style={styles.noDataText}>No hay cajas registradas</p>
+            <p style={styles.noDataText}>
+              {filtroSucursal ? 'No hay cajas registradas con los filtros aplicados' : 'No hay cajas registradas'}
+            </p>
           </div>
         ) : (
           <div style={styles.grid}>
@@ -191,6 +248,14 @@ const Caja = () => {
                 </div>
 
                 <div style={styles.cardBody}>
+                  {/* Sucursal */}
+                  <div style={styles.infoRow}>
+                    <Building2 size={16} style={styles.infoIcon} />
+                    <span style={styles.sucursalBadge}>
+                      {caja.sucursal_nombre || 'Sin asignar'}
+                    </span>
+                  </div>
+
                   <div style={styles.infoRow}>
                     <User size={16} style={styles.infoIcon} />
                     <span style={styles.infoValue}>{caja.usuario_apertura_nombre}</span>
@@ -276,6 +341,10 @@ const styles = {
     color: '#6b7280',
     margin: 0,
   },
+  sucursalInfo: {
+    color: '#10b981',
+    fontWeight: '600',
+  },
   addButton: {
     padding: '12px 24px',
     fontSize: '16px',
@@ -288,6 +357,31 @@ const styles = {
     transition: 'all 0.2s',
     display: 'flex',
     alignItems: 'center',
+  },
+  filterBox: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+    marginBottom: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+  },
+  filterLabel: {
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#4b5563',
+  },
+  select: {
+    padding: '10px 16px',
+    fontSize: '15px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    outline: 'none',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    minWidth: '250px',
   },
   cajaActiva: {
     backgroundColor: 'white',
@@ -315,6 +409,10 @@ const styles = {
     fontSize: '14px',
     color: '#6b7280',
     margin: 0,
+  },
+  sucursalBadgeInline: {
+    color: '#10b981',
+    fontWeight: '600',
   },
   cajaActivaStats: {
     display: 'grid',
@@ -474,6 +572,14 @@ const styles = {
   },
   infoValue: {
     color: '#4b5563',
+  },
+  sucursalBadge: {
+    padding: '4px 12px',
+    backgroundColor: '#d1fae5',
+    color: '#065f46',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontWeight: '600',
   },
   montoRow: {
     display: 'grid',

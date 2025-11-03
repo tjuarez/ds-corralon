@@ -1,29 +1,42 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { comprasApi } from '../api/compras';
+import { sucursalesApi } from '../api/sucursales';
 import Layout from '../components/Layout';
-import { Plus, Search, Eye, DollarSign, Calendar, User, FileText, XCircle, CheckCircle, Clock } from 'lucide-react';
+import { Plus, Search, Eye, DollarSign, Calendar, User, FileText, XCircle, CheckCircle, Clock, Building2 } from 'lucide-react';
 
 const Compras = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const { showError } = useNotification();
   
   const [compras, setCompras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [sucursales, setSucursales] = useState([]);
+  const [filtroSucursal, setFiltroSucursal] = useState('');
 
   useEffect(() => {
     loadCompras();
-  }, [search]);
+    if (user?.rol === 'admin') {
+      loadSucursales();
+    }
+  }, []);
 
   const loadCompras = async () => {
     try {
       setLoading(true);
       const filters = {};
       if (search) filters.search = search;
+
+      // Admin puede filtrar por sucursal
+      if (user?.rol === 'admin' && filtroSucursal) {
+        filters.sucursal_id = filtroSucursal;
+      }
       
       const data = await comprasApi.getAll(filters);
       setCompras(data.compras);
@@ -34,6 +47,22 @@ const Compras = () => {
       setLoading(false);
     }
   };
+
+  const loadSucursales = async () => {
+    try {
+      const data = await sucursalesApi.getAll({ activa: 'true' });
+      setSucursales(data.sucursales);
+    } catch (error) {
+      console.error('Error al cargar sucursales:', error);
+    }
+  };
+
+  // Aplicar filtro cuando cambia
+  useEffect(() => {
+    if (user) {
+      loadCompras();
+    }
+  }, [filtroSucursal, search]);
 
   const getEstadoBadge = (estado) => {
     const estados = {
@@ -95,6 +124,9 @@ const Compras = () => {
           <h1 style={styles.title}>{t('purchases')}</h1>
           <p style={styles.subtitle}>
             {compras.length} {compras.length === 1 ? 'compra registrada' : 'compras registradas'}
+            {user?.rol !== 'admin' && user?.sucursal_nombre && (
+              <span style={styles.sucursalInfo}> • {user.sucursal_nombre}</span>
+            )}
           </p>
         </div>
         <button
@@ -112,12 +144,30 @@ const Compras = () => {
           <Search size={18} style={styles.searchIcon} />
           <input
             type="text"
-            placeholder={`${t('search')}...`}
+            placeholder={`${t('search')} por número, proveedor o sucursal...`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={styles.searchInput}
           />
         </div>
+
+        {/* Filtro de Sucursal - Solo para Admin */}
+        {user?.rol === 'admin' && (
+          <div style={styles.filterGroup}>
+            <select
+              value={filtroSucursal}
+              onChange={(e) => setFiltroSucursal(e.target.value)}
+              style={styles.select}
+            >
+              <option value="">Todas las sucursales</option>
+              {sucursales.map(sucursal => (
+                <option key={sucursal.id} value={sucursal.id}>
+                  {sucursal.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Lista de compras */}
@@ -129,13 +179,17 @@ const Compras = () => {
       ) : compras.length === 0 ? (
         <div style={styles.noData}>
           <FileText size={48} color="#9ca3af" />
-          <p style={styles.noDataText}>{t('noData')}</p>
-          <button
-            onClick={() => navigate('/compras/nueva')}
-            style={styles.addButtonSecondary}
-          >
-            Registrar primera compra
-          </button>
+          <p style={styles.noDataText}>
+            {search || filtroSucursal ? 'No se encontraron compras con los filtros aplicados' : t('noData')}
+          </p>
+          {!search && !filtroSucursal && (
+            <button
+              onClick={() => navigate('/compras/nueva')}
+              style={styles.addButtonSecondary}
+            >
+              Registrar primera compra
+            </button>
+          )}
         </div>
       ) : (
         <div style={styles.grid}>
@@ -154,6 +208,14 @@ const Compras = () => {
               </div>
 
               <div style={styles.cardBody}>
+                {/* Sucursal */}
+                <div style={styles.infoRow}>
+                  <Building2 size={16} style={styles.infoIcon} />
+                  <span style={styles.sucursalBadge}>
+                    {compra.sucursal_nombre || 'Sin asignar'}
+                  </span>
+                </div>
+
                 <div style={styles.infoRow}>
                   <Calendar size={16} style={styles.infoIcon} />
                   <span style={styles.infoValue}>
@@ -219,6 +281,10 @@ const styles = {
     color: '#6b7280',
     margin: 0,
   },
+  sucursalInfo: {
+    color: '#10b981',
+    fontWeight: '600',
+  },
   addButton: {
     padding: '12px 24px',
     fontSize: '16px',
@@ -267,6 +333,19 @@ const styles = {
     border: '2px solid #e5e7eb',
     borderRadius: '8px',
     outline: 'none',
+  },
+  filterGroup: {
+    minWidth: '200px',
+  },
+  select: {
+    width: '100%',
+    padding: '12px 16px',
+    fontSize: '15px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    outline: 'none',
+    backgroundColor: 'white',
+    cursor: 'pointer',
   },
   loading: {
     display: 'flex',
@@ -361,6 +440,14 @@ const styles = {
   },
   infoValue: {
     color: '#4b5563',
+  },
+  sucursalBadge: {
+    padding: '4px 12px',
+    backgroundColor: '#d1fae5',
+    color: '#065f46',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontWeight: '600',
   },
   cardFooter: {
     display: 'flex',

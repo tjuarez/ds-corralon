@@ -3,18 +3,39 @@ import { getAll, getOne, runQuery } from '../db/database.js';
 // Obtener todas las cajas
 export const getCajas = async (req, res) => {
   try {
-    const { fecha_desde, fecha_hasta, estado, usuario_id } = req.query;
+    const { fecha_desde, fecha_hasta, estado, usuario_id, sucursal_id } = req.query;
+    const user = req.user;
 
     let sql = `
       SELECT c.*,
              ua.nombre || ' ' || ua.apellido as usuario_apertura_nombre,
-             uc.nombre || ' ' || uc.apellido as usuario_cierre_nombre
+             uc.nombre || ' ' || uc.apellido as usuario_cierre_nombre,
+             s.nombre as sucursal_nombre
       FROM cajas c
       LEFT JOIN usuarios ua ON c.usuario_apertura_id = ua.id
       LEFT JOIN usuarios uc ON c.usuario_cierre_id = uc.id
+      LEFT JOIN sucursales s ON c.sucursal_id = s.id
       WHERE 1=1
     `;
     const params = [];
+
+    // FILTRO CRÍTICO: Control por sucursal
+    if (user.rol !== 'admin') {
+      // No-admin: SOLO puede ver cajas de su sucursal
+      if (!user.sucursal_id) {
+        return res.status(400).json({ 
+          error: 'Usuario no tiene sucursal asignada' 
+        });
+      }
+      sql += ' AND c.sucursal_id = ?';
+      params.push(user.sucursal_id);
+    } else {
+      // Admin: puede filtrar por sucursal específica o ver todas
+      if (sucursal_id) {
+        sql += ' AND c.sucursal_id = ?';
+        params.push(sucursal_id);
+      }
+    }
 
     if (fecha_desde) {
       sql += ` AND DATE(c.fecha_apertura) >= ?`;
@@ -51,10 +72,12 @@ export const getCajaById = async (req, res) => {
     const caja = await getOne(`
       SELECT c.*,
              ua.nombre || ' ' || ua.apellido as usuario_apertura_nombre,
-             uc.nombre || ' ' || uc.apellido as usuario_cierre_nombre
+             uc.nombre || ' ' || uc.apellido as usuario_cierre_nombre,
+             s.nombre as sucursal_nombre
       FROM cajas c
       LEFT JOIN usuarios ua ON c.usuario_apertura_id = ua.id
       LEFT JOIN usuarios uc ON c.usuario_cierre_id = uc.id
+      LEFT JOIN sucursales s ON c.sucursal_id = s.id
       WHERE c.id = ?
     `, [id]);
 
@@ -88,15 +111,24 @@ export const getCajaById = async (req, res) => {
 export const getCajaAbierta = async (req, res) => {
   try {
     const { usuario_id } = req.query;
+    const user = req.user;
 
     let sql = `
       SELECT c.*,
-             ua.nombre || ' ' || ua.apellido as usuario_apertura_nombre
+             ua.nombre || ' ' || ua.apellido as usuario_apertura_nombre,
+             s.nombre as sucursal_nombre
       FROM cajas c
       LEFT JOIN usuarios ua ON c.usuario_apertura_id = ua.id
+      LEFT JOIN sucursales s ON c.sucursal_id = s.id
       WHERE c.estado = 'abierta'
     `;
     const params = [];
+
+    // FILTRO: Solo puede ver caja abierta de su sucursal
+    if (user.sucursal_id) {
+      sql += ` AND c.sucursal_id = ?`;
+      params.push(user.sucursal_id);
+    }
 
     if (usuario_id) {
       sql += ` AND c.usuario_apertura_id = ?`;
@@ -132,15 +164,23 @@ export const getCajaAbierta = async (req, res) => {
 export const abrirCaja = async (req, res) => {
   try {
     const { monto_inicial, observaciones, usuario_id } = req.body;
+    const user = req.user;
+
+    // VALIDACIÓN CRÍTICA: Usuario debe tener sucursal
+    if (!user.sucursal_id) {
+      return res.status(400).json({
+        error: 'No puedes abrir caja sin tener una sucursal asignada. Contacte al administrador.'
+      });
+    }
 
     if (!monto_inicial || monto_inicial < 0) {
       return res.status(400).json({ error: 'Monto inicial inválido' });
     }
 
-    // Verificar que no haya otra caja abierta del mismo usuario
+    // Verificar que no haya otra caja abierta del mismo usuario en la misma sucursal
     const cajaAbierta = await getOne(
-      'SELECT id FROM cajas WHERE usuario_apertura_id = ? AND estado = ?',
-      [usuario_id, 'abierta']
+      'SELECT id FROM cajas WHERE usuario_apertura_id = ? AND sucursal_id = ? AND estado = ?',
+      [usuario_id, user.sucursal_id, 'abierta']
     );
 
     if (cajaAbierta) {
@@ -155,13 +195,13 @@ export const abrirCaja = async (req, res) => {
     );
     const numeroNuevo = ultimaCaja ? ultimaCaja.numero + 1 : 1;
 
-    // Crear nueva caja
+    // CREAR NUEVA CAJA CON SUCURSAL_ID
     const result = await runQuery(`
       INSERT INTO cajas (
-        numero, fecha_apertura, usuario_apertura_id, monto_inicial,
+        numero, fecha_apertura, usuario_apertura_id, sucursal_id, monto_inicial,
         estado, observaciones_apertura
-      ) VALUES (?, CURRENT_TIMESTAMP, ?, ?, 'abierta', ?)
-    `, [numeroNuevo, usuario_id, monto_inicial, observaciones]);
+      ) VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'abierta', ?)
+    `, [numeroNuevo, usuario_id, user.sucursal_id, monto_inicial, observaciones]);
 
     res.status(201).json({
       message: 'Caja abierta exitosamente',

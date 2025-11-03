@@ -3,21 +3,42 @@ import { getAll, getOne, runQuery } from '../db/database.js';
 // Obtener todas las compras (con búsqueda y filtros)
 export const getCompras = async (req, res) => {
   try {
-    const { search, fecha_desde, fecha_hasta, proveedor_id, estado } = req.query;
+    const { search, fecha_desde, fecha_hasta, proveedor_id, estado, sucursal_id } = req.query;
+    const user = req.user;
 
     let sql = `
       SELECT c.*, 
              p.razon_social as proveedor_nombre,
              m.codigo as moneda_codigo,
              m.simbolo as moneda_simbolo,
-             u.nombre || ' ' || u.apellido as usuario_nombre
+             u.nombre || ' ' || u.apellido as usuario_nombre,
+             s.nombre as sucursal_nombre
       FROM compras c
       LEFT JOIN proveedores p ON c.proveedor_id = p.id
       LEFT JOIN monedas m ON c.moneda_id = m.id
       LEFT JOIN usuarios u ON c.usuario_id = u.id
+      LEFT JOIN sucursales s ON c.sucursal_id = s.id
       WHERE 1=1
     `;
     const params = [];
+
+    // FILTRO CRÍTICO: Control por sucursal
+    if (user.rol !== 'admin') {
+      // No-admin: SOLO puede ver compras de su sucursal
+      if (!user.sucursal_id) {
+        return res.status(400).json({ 
+          error: 'Usuario no tiene sucursal asignada' 
+        });
+      }
+      sql += ' AND c.sucursal_id = ?';
+      params.push(user.sucursal_id);
+    } else {
+      // Admin: puede filtrar por sucursal específica o ver todas
+      if (sucursal_id) {
+        sql += ' AND c.sucursal_id = ?';
+        params.push(sucursal_id);
+      }
+    }
 
     // Búsqueda por número o proveedor
     if (search) {
@@ -72,11 +93,13 @@ export const getCompraById = async (req, res) => {
              p.email as proveedor_email,
              m.codigo as moneda_codigo,
              m.simbolo as moneda_simbolo,
-             u.nombre || ' ' || u.apellido as usuario_nombre
+             u.nombre || ' ' || u.apellido as usuario_nombre,
+             s.nombre as sucursal_nombre
       FROM compras c
       LEFT JOIN proveedores p ON c.proveedor_id = p.id
       LEFT JOIN monedas m ON c.moneda_id = m.id
       LEFT JOIN usuarios u ON c.usuario_id = u.id
+      LEFT JOIN sucursales s ON c.sucursal_id = s.id
       WHERE c.id = ?
     `, [id]);
 
@@ -145,6 +168,15 @@ export const createCompra = async (req, res) => {
       usuario_id
     } = req.body;
 
+    const user = req.user;
+
+    // VALIDACIÓN CRÍTICA: Usuario debe tener sucursal
+    if (!user.sucursal_id) {
+      return res.status(400).json({
+        error: 'No puedes crear compras sin tener una sucursal asignada. Contacte al administrador.'
+      });
+    }
+
     // Validaciones
     if (!proveedor_id || !fecha || !moneda_id || !detalle || detalle.length === 0 || !forma_pago) {
       return res.status(400).json({ 
@@ -186,17 +218,17 @@ export const createCompra = async (req, res) => {
     // Generar número de comprobante interno
     const numero_comprobante = await generateNumeroComprobante();
 
-    // Insertar compra
+    // INSERTAR COMPRA CON SUCURSAL_ID
     const result = await runQuery(`
       INSERT INTO compras (
         numero_comprobante, numero_factura, tipo_comprobante, proveedor_id, 
         fecha, moneda_id, subtotal, descuento_porcentaje, descuento_monto, 
-        total, forma_pago, estado, observaciones, usuario_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'recibida', ?, ?)
+        total, forma_pago, estado, observaciones, usuario_id, sucursal_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'recibida', ?, ?, ?)
     `, [
       numero_comprobante, numero_factura, tipo_comprobante, proveedor_id,
       fecha, moneda_id, subtotal, descuento_porcentaje || 0, descuentoMonto, 
-      total, forma_pago, observaciones, usuario_id
+      total, forma_pago, observaciones, usuario_id, user.sucursal_id
     ]);
 
     const compraId = result.id;
