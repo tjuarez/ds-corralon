@@ -1,9 +1,11 @@
+import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+
 const API_URL = '/api/presupuestos';
 
 export const presupuestosApi = {
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}?${params}`, {
       credentials: 'include',
     });
 
@@ -16,7 +18,7 @@ export const presupuestosApi = {
   },
 
   getById: async (id) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       credentials: 'include',
     });
 
@@ -29,7 +31,7 @@ export const presupuestosApi = {
   },
 
   create: async (presupuestoData) => {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithSucursal(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +49,7 @@ export const presupuestosApi = {
   },
 
   update: async (id, presupuestoData) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -65,7 +67,7 @@ export const presupuestosApi = {
   },
 
   updateEstado: async (id, estado) => {
-    const response = await fetch(`${API_URL}/${id}/estado`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}/estado`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -83,7 +85,7 @@ export const presupuestosApi = {
   },
 
   delete: async (id) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });

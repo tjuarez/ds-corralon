@@ -1,9 +1,11 @@
+import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+
 const API_URL = '/api/caja';
 
 export const cajaApi = {
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}?${params}`, {
       credentials: 'include',
     });
 
@@ -16,7 +18,7 @@ export const cajaApi = {
   },
 
   getById: async (id) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       credentials: 'include',
     });
 
@@ -30,7 +32,7 @@ export const cajaApi = {
 
   getCajaAbierta: async (usuario_id) => {
     const params = new URLSearchParams({ usuario_id });
-    const response = await fetch(`${API_URL}/abierta?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}/abierta?${params}`, {
       credentials: 'include',
     });
 
@@ -43,7 +45,7 @@ export const cajaApi = {
   },
 
   abrirCaja: async (cajaData) => {
-    const response = await fetch(`${API_URL}/abrir`, {
+    const response = await fetchWithSucursal(`${API_URL}/abrir`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -61,7 +63,7 @@ export const cajaApi = {
   },
 
   cerrarCaja: async (id, cierreData) => {
-    const response = await fetch(`${API_URL}/${id}/cerrar`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}/cerrar`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -79,7 +81,7 @@ export const cajaApi = {
   },
 
   registrarMovimiento: async (movimientoData) => {
-    const response = await fetch(`${API_URL}/movimientos`, {
+    const response = await fetchWithSucursal(`${API_URL}/movimientos`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -97,7 +99,7 @@ export const cajaApi = {
   },
 
   getResumen: async (cajaId) => {
-    const response = await fetch(`${API_URL}/${cajaId}/resumen`, {
+    const response = await fetchWithSucursal(`${API_URL}/${cajaId}/resumen`, {
       credentials: 'include',
     });
 

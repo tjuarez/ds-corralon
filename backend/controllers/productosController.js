@@ -4,18 +4,46 @@ import { getAll, getOne, runQuery } from '../db/database.js';
 export const getProductos = async (req, res) => {
   try {
     const { search, categoria_id, activo, stock_bajo } = req.query;
+    const user = req.user;
 
-    let sql = `
-      SELECT p.*, 
-             c.nombre as categoria_nombre,
-             prov.razon_social as proveedor_nombre,
-             (SELECT COUNT(*) FROM productos_precios WHERE producto_id = p.id) as precios_count
-      FROM productos p
-      LEFT JOIN categorias c ON p.categoria_id = c.id
-      LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
-      WHERE 1=1
-    `;
-    const params = [];
+    let sql = '';
+    let params = [];
+
+    // ========== CONSULTA SEGÚN ROL ==========
+    if (user.rol !== 'admin') {
+      // NO-ADMIN: Mostrar stock de su sucursal
+      if (!user.sucursal_id) {
+        return res.status(400).json({ 
+          error: 'Usuario no tiene sucursal asignada' 
+        });
+      }
+
+      sql = `
+        SELECT p.*, 
+               c.nombre as categoria_nombre,
+               prov.razon_social as proveedor_nombre,
+               COALESCE(ss.stock_actual, 0) as stock_actual,
+               (SELECT COUNT(*) FROM productos_precios WHERE producto_id = p.id) as precios_count
+        FROM productos p
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
+        LEFT JOIN stock_sucursales ss ON p.id = ss.producto_id AND ss.sucursal_id = ?
+        WHERE 1=1
+      `;
+      params.push(user.sucursal_id);
+    } else {
+      // ADMIN: Mostrar stock total
+      sql = `
+        SELECT p.*, 
+               c.nombre as categoria_nombre,
+               prov.razon_social as proveedor_nombre,
+               (SELECT COUNT(*) FROM productos_precios WHERE producto_id = p.id) as precios_count
+        FROM productos p
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
+        WHERE 1=1
+      `;
+    }
 
     // Búsqueda por texto
     if (search) {
@@ -38,7 +66,11 @@ export const getProductos = async (req, res) => {
 
     // Filtro por stock bajo
     if (stock_bajo === 'true') {
-      sql += ` AND p.stock_actual <= p.stock_minimo`;
+      if (user.rol !== 'admin') {
+        sql += ` AND COALESCE(ss.stock_actual, 0) <= p.stock_minimo`;
+      } else {
+        sql += ` AND p.stock_actual <= p.stock_minimo`;
+      }
     }
 
     sql += ` ORDER BY p.descripcion ASC`;
@@ -55,17 +87,47 @@ export const getProductos = async (req, res) => {
 export const getProductoById = async (req, res) => {
   try {
     const { id } = req.params;
+    const user = req.user;
 
-    const producto = await getOne(
-      `SELECT p.*, 
-              c.nombre as categoria_nombre,
-              prov.razon_social as proveedor_nombre
-       FROM productos p
-       LEFT JOIN categorias c ON p.categoria_id = c.id
-       LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
-       WHERE p.id = ?`,
-      [id]
-    );
+    let sql = '';
+    let params = [];
+
+    // ========== CONSULTA SEGÚN ROL ==========
+    if (user.rol !== 'admin') {
+      // NO-ADMIN: Mostrar stock de su sucursal
+      if (!user.sucursal_id) {
+        return res.status(400).json({ 
+          error: 'Usuario no tiene sucursal asignada' 
+        });
+      }
+
+      sql = `
+        SELECT p.*, 
+               c.nombre as categoria_nombre,
+               prov.razon_social as proveedor_nombre,
+               COALESCE(ss.stock_actual, 0) as stock_actual
+        FROM productos p
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
+        LEFT JOIN stock_sucursales ss ON p.id = ss.producto_id AND ss.sucursal_id = ?
+        WHERE p.id = ?
+      `;
+      params = [user.sucursal_id, id];
+    } else {
+      // ADMIN: Mostrar stock total
+      sql = `
+        SELECT p.*, 
+               c.nombre as categoria_nombre,
+               prov.razon_social as proveedor_nombre
+        FROM productos p
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
+        WHERE p.id = ?
+      `;
+      params = [id];
+    }
+
+    const producto = await getOne(sql, params);
 
     if (!producto) {
       return res.status(404).json({ error: 'Producto no encontrado' });
@@ -82,7 +144,25 @@ export const getProductoById = async (req, res) => {
       [id]
     );
 
-    res.json({ producto: { ...producto, precios } });
+    // Si es admin, agregar información de stock por sucursal
+    let stockPorSucursal = [];
+    if (user.rol === 'admin') {
+      stockPorSucursal = await getAll(`
+        SELECT ss.*, s.nombre as sucursal_nombre, s.codigo as sucursal_codigo
+        FROM stock_sucursales ss
+        LEFT JOIN sucursales s ON ss.sucursal_id = s.id
+        WHERE ss.producto_id = ?
+        ORDER BY s.nombre
+      `, [id]);
+    }
+
+    res.json({ 
+      producto: { 
+        ...producto, 
+        precios,
+        ...(user.rol === 'admin' && { stock_por_sucursal: stockPorSucursal })
+      } 
+    });
   } catch (error) {
     console.error('Error en getProductoById:', error);
     res.status(500).json({ error: 'Error al obtener producto' });
@@ -126,21 +206,30 @@ export const createProducto = async (req, res) => {
       });
     }
 
-    // Insertar producto
+    // Insertar producto (stock_actual será 0, se maneja por sucursal)
     const result = await runQuery(
       `INSERT INTO productos (
         codigo, descripcion, categoria_id, marca, unidad_medida, 
         stock_minimo, stock_actual, ubicacion, proveedor_id, 
         imagen_url, observaciones, activo
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 1)`,
       [
         codigo, descripcion, categoria_id || null, marca, unidad_medida,
-        stock_minimo || 0, stock_actual || 0, ubicacion, proveedor_id || null,
+        stock_minimo || 0, ubicacion, proveedor_id || null,
         imagen_url, observaciones
       ]
     );
 
     const productoId = result.id;
+
+    // Inicializar stock en todas las sucursales activas
+    const sucursales = await getAll('SELECT id FROM sucursales WHERE activa = 1');
+    for (const sucursal of sucursales) {
+      await runQuery(`
+        INSERT INTO stock_sucursales (producto_id, sucursal_id, stock_actual, stock_minimo)
+        VALUES (?, ?, 0, ?)
+      `, [productoId, sucursal.id, stock_minimo || 0]);
+    }
 
     // Insertar precios si se proporcionan
     if (precios && Array.isArray(precios) && precios.length > 0) {
@@ -175,7 +264,6 @@ export const updateProducto = async (req, res) => {
       marca,
       unidad_medida,
       stock_minimo,
-      stock_actual,
       ubicacion,
       proveedor_id,
       imagen_url,
@@ -203,16 +291,17 @@ export const updateProducto = async (req, res) => {
       }
     }
 
+    // NO actualizar stock_actual directamente, se maneja por sucursal
     await runQuery(
       `UPDATE productos SET
         codigo = ?, descripcion = ?, categoria_id = ?, marca = ?, 
-        unidad_medida = ?, stock_minimo = ?, stock_actual = ?, 
+        unidad_medida = ?, stock_minimo = ?, 
         ubicacion = ?, proveedor_id = ?, imagen_url = ?, 
         observaciones = ?, activo = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?`,
       [
         codigo, descripcion, categoria_id || null, marca, unidad_medida,
-        stock_minimo, stock_actual, ubicacion, proveedor_id || null,
+        stock_minimo, ubicacion, proveedor_id || null,
         imagen_url, observaciones, activo !== undefined ? activo : 1, id
       ]
     );

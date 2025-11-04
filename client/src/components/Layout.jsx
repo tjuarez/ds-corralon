@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import SucursalSelector from './SucursalSelector';
 import {
   LayoutDashboard,
   Users,
@@ -154,10 +155,15 @@ const Layout = ({ children }) => {
             </div>
 
             <div style={styles.topBarRight}>
-              <div style={styles.sucursalBadge}>
-                <Store size={16} style={{ marginRight: '6px' }} />
-                {user?.sucursal_nombre || 'N/A'}
-              </div>
+              {/* Selector de sucursal para admin, badge estático para otros */}
+              {user?.rol === 'admin' ? (
+                <SucursalSelector />
+              ) : (
+                <div style={styles.sucursalBadge}>
+                  <Store size={16} style={{ marginRight: '6px' }} />
+                  {user?.sucursal_nombre || 'Sin sucursal'}
+                </div>
+              )}
 
               <select
                 value={language}
@@ -333,13 +339,13 @@ const styles = {
     gap: '15px',
   },
   sucursalBadge: {
-    padding: '6px 12px',
-    backgroundColor: '#eff6ff',
-    color: '#1e40af',
-    borderRadius: '6px',
-    fontSize: '13px',
+    padding: '8px 16px',
+    backgroundColor: '#f3f4f6',
+    color: '#4b5563',
+    borderRadius: '8px',
+    fontSize: '14px',
     fontWeight: '600',
-    border: '1px solid #bfdbfe',
+    border: '2px solid #d1d5db',
     display: 'flex',
     alignItems: 'center',
   },

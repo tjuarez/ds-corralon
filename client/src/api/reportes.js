@@ -1,8 +1,10 @@
+import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+
 const API_URL = '/api/reportes';
 
 export const reportesApi = {
   getDashboard: async () => {
-    const response = await fetch(`${API_URL}/dashboard`, {
+    const response = await fetchWithSucursal(`${API_URL}/dashboard`, {
       credentials: 'include',
     });
 
@@ -16,7 +18,7 @@ export const reportesApi = {
 
   getReporteVentas: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}/ventas?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}/ventas?${params}`, {
       credentials: 'include',
     });
 
@@ -30,7 +32,7 @@ export const reportesApi = {
 
   getReporteProductos: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}/productos?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}/productos?${params}`, {
       credentials: 'include',
     });
 
@@ -44,7 +46,7 @@ export const reportesApi = {
 
   getReporteClientes: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}/clientes?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}/clientes?${params}`, {
       credentials: 'include',
     });
 
@@ -58,7 +60,7 @@ export const reportesApi = {
 
   getReporteStock: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}/stock?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}/stock?${params}`, {
       credentials: 'include',
     });
 
@@ -72,7 +74,7 @@ export const reportesApi = {
 
   getReporteCaja: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}/caja?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}/caja?${params}`, {
       credentials: 'include',
     });
 
@@ -86,7 +88,7 @@ export const reportesApi = {
 
   getReporteRentabilidad: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}/rentabilidad?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}/rentabilidad?${params}`, {
       credentials: 'include',
     });
 

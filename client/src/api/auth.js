@@ -1,8 +1,10 @@
+import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+
 const API_URL = '/api';
 
 export const authApi = {
   login: async (username, password) => {
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetchWithSucursal(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -20,7 +22,7 @@ export const authApi = {
   },
 
   register: async (userData) => {
-    const response = await fetch(`${API_URL}/auth/register`, {
+    const response = await fetchWithSucursal(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -38,7 +40,7 @@ export const authApi = {
   },
 
   logout: async () => {
-    const response = await fetch(`${API_URL}/auth/logout`, {
+    const response = await fetchWithSucursal(`${API_URL}/auth/logout`, {
       method: 'POST',
       credentials: 'include',
     });
@@ -51,7 +53,7 @@ export const authApi = {
   },
 
   getCurrentUser: async () => {
-    const response = await fetch(`${API_URL}/auth/me`, {
+    const response = await fetchWithSucursal(`${API_URL}/auth/me`, {
       credentials: 'include',
     });
 
@@ -63,7 +65,7 @@ export const authApi = {
   },
 
   changePassword: async (currentPassword, newPassword) => {
-    const response = await fetch(`${API_URL}/auth/change-password`, {
+    const response = await fetchWithSucursal(`${API_URL}/auth/change-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

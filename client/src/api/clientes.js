@@ -1,9 +1,11 @@
+import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+
 const API_URL = '/api/clientes';
 
 export const clientesApi = {
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}?${params}`, {
       credentials: 'include',
     });
 
@@ -16,7 +18,7 @@ export const clientesApi = {
   },
 
   getById: async (id) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       credentials: 'include',
     });
 
@@ -29,7 +31,7 @@ export const clientesApi = {
   },
 
   create: async (clienteData) => {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithSucursal(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +49,7 @@ export const clientesApi = {
   },
 
   update: async (id, clienteData) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -65,7 +67,7 @@ export const clientesApi = {
   },
 
   delete: async (id) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -79,7 +81,7 @@ export const clientesApi = {
   },
 
   addContacto: async (clienteId, contactoData) => {
-    const response = await fetch(`${API_URL}/${clienteId}/contactos`, {
+    const response = await fetchWithSucursal(`${API_URL}/${clienteId}/contactos`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -97,7 +99,7 @@ export const clientesApi = {
   },
 
   deleteContacto: async (contactoId) => {
-    const response = await fetch(`${API_URL}/contactos/${contactoId}`, {
+    const response = await fetchWithSucursal(`${API_URL}/contactos/${contactoId}`, {
       method: 'DELETE',
       credentials: 'include',
     });

@@ -1,9 +1,11 @@
+import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+
 const API_URL = '/api/cuenta-corriente';
 
 export const cuentaCorrienteApi = {
   getClientes: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}/clientes?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}/clientes?${params}`, {
       credentials: 'include',
     });
 
@@ -17,7 +19,7 @@ export const cuentaCorrienteApi = {
 
   getEstadoCuenta: async (clienteId, filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}/clientes/${clienteId}/estado-cuenta?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}/clientes/${clienteId}/estado-cuenta?${params}`, {
       credentials: 'include',
     });
 
@@ -30,7 +32,7 @@ export const cuentaCorrienteApi = {
   },
 
   registrarPago: async (pagoData) => {
-    const response = await fetch(`${API_URL}/pagos`, {
+    const response = await fetchWithSucursal(`${API_URL}/pagos`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -48,7 +50,7 @@ export const cuentaCorrienteApi = {
   },
 
   getResumen: async () => {
-    const response = await fetch(`${API_URL}/resumen`, {
+    const response = await fetchWithSucursal(`${API_URL}/resumen`, {
       credentials: 'include',
     });
 

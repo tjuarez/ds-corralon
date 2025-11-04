@@ -1,9 +1,11 @@
+import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+
 const API_URL = '/api/ventas';
 
 export const ventasApi = {
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}?${params}`, {
       credentials: 'include',
     });
 
@@ -16,7 +18,7 @@ export const ventasApi = {
   },
 
   getById: async (id) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       credentials: 'include',
     });
 
@@ -29,7 +31,7 @@ export const ventasApi = {
   },
 
   create: async (ventaData) => {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithSucursal(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +49,7 @@ export const ventasApi = {
   },
 
   anular: async (id, usuario_id) => {
-    const response = await fetch(`${API_URL}/${id}/anular`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}/anular`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

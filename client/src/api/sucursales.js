@@ -1,9 +1,11 @@
+import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+
 const API_URL = '/api/sucursales';
 
 export const sucursalesApi = {
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}?${params}`, {
+    const response = await fetchWithSucursal(`${API_URL}?${params}`, {
       credentials: 'include',
     });
 
@@ -16,7 +18,7 @@ export const sucursalesApi = {
   },
 
   getById: async (id) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       credentials: 'include',
     });
 
@@ -29,7 +31,7 @@ export const sucursalesApi = {
   },
 
   create: async (sucursalData) => {
-    const response = await fetch(API_URL, {
+    const response = await fetchWithSucursal(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +49,7 @@ export const sucursalesApi = {
   },
 
   update: async (id, sucursalData) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -65,7 +67,7 @@ export const sucursalesApi = {
   },
 
   toggle: async (id) => {
-    const response = await fetch(`${API_URL}/${id}/toggle`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}/toggle`, {
       method: 'PATCH',
       credentials: 'include',
     });
@@ -79,7 +81,7 @@ export const sucursalesApi = {
   },
 
   delete: async (id) => {
-    const response = await fetch(`${API_URL}/${id}`, {
+    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });
