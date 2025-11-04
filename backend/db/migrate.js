@@ -445,13 +445,22 @@ const migrations = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     producto_id INTEGER NOT NULL,
     sucursal_id INTEGER NOT NULL,
-    cantidad DECIMAL(10,2) DEFAULT 0,
+    stock_actual DECIMAL(10,2) DEFAULT 0,
     stock_minimo DECIMAL(10,2) DEFAULT 0,
+    stock_maximo DECIMAL(10,2) DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (producto_id) REFERENCES productos(id),
-    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
+    FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
+    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id) ON DELETE CASCADE,
     UNIQUE(producto_id, sucursal_id)
   )`,
+
+  // 23.6. Índices para stock_sucursales
+  `CREATE INDEX IF NOT EXISTS idx_stock_sucursales_producto ON stock_sucursales(producto_id)`,
+  
+  `CREATE INDEX IF NOT EXISTS idx_stock_sucursales_sucursal ON stock_sucursales(sucursal_id)`,
+  
+  `CREATE INDEX IF NOT EXISTS idx_movimientos_stock_sucursal ON movimientos_stock(sucursal_id)`,
 
   // 24. Tabla de historial de fidelización
   `CREATE TABLE IF NOT EXISTS fidelizacion_historial (

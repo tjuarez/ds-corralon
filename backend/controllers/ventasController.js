@@ -1,4 +1,5 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { actualizarStockTotal } from './stockSucursalesController.js';
 
 // Obtener todas las ventas (con búsqueda y filtros)
 export const getVentas = async (req, res) => {
@@ -204,10 +205,10 @@ export const createVenta = async (req, res) => {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
-    // Verificar stock disponible
+    // ========== VERIFICAR STOCK POR SUCURSAL ==========
     for (const item of detalle) {
       const producto = await getOne(
-        'SELECT id, codigo, descripcion, stock_actual FROM productos WHERE id = ?',
+        'SELECT id, codigo, descripcion FROM productos WHERE id = ?',
         [item.producto_id]
       );
 
@@ -217,9 +218,21 @@ export const createVenta = async (req, res) => {
         });
       }
 
-      if (producto.stock_actual < item.cantidad) {
+      // Verificar stock en la sucursal
+      const stockSucursal = await getOne(
+        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
+        [item.producto_id, user.sucursal_id]
+      );
+
+      if (!stockSucursal) {
         return res.status(400).json({ 
-          error: `Stock insuficiente para ${producto.codigo} - ${producto.descripcion}. Stock actual: ${producto.stock_actual}` 
+          error: `El producto ${producto.codigo} - ${producto.descripcion} no tiene stock inicializado en esta sucursal` 
+        });
+      }
+
+      if (stockSucursal.stock_actual < item.cantidad) {
+        return res.status(400).json({ 
+          error: `Stock insuficiente para ${producto.codigo} - ${producto.descripcion}. Stock disponible en sucursal: ${stockSucursal.stock_actual}` 
         });
       }
     }
@@ -238,7 +251,6 @@ export const createVenta = async (req, res) => {
     // Si hay pagos múltiples, validar que sumen el total
     if (pagos && pagos.length > 0) {
       const sumaPagos = pagos.reduce((sum, p) => sum + parseFloat(p.monto), 0);
-      // Usar toFixed para evitar problemas de precisión de punto flotante
       if (Math.abs(sumaPagos - total) > 0.01) {
         return res.status(400).json({ 
           error: `La suma de los pagos (${sumaPagos}) no coincide con el total (${total})` 
@@ -249,7 +261,7 @@ export const createVenta = async (req, res) => {
     // Generar número de comprobante
     const numero_comprobante = await generateNumeroComprobante(tipo_comprobante);
 
-    // ========== INSERTAR VENTA CON SUCURSAL_ID ==========
+    // Insertar venta
     const formaPagoVenta = forma_pago || 'multiple';
     const result = await runQuery(`
       INSERT INTO ventas (
@@ -265,7 +277,7 @@ export const createVenta = async (req, res) => {
 
     const ventaId = result.id;
 
-    // Insertar detalle y actualizar stock
+    // ========== ACTUALIZAR STOCK POR SUCURSAL ==========
     for (const item of detalle) {
       const itemSubtotal = item.cantidad * item.precio_unitario;
       const itemDescuentoMonto = itemSubtotal * (item.descuento_porcentaje || 0) / 100;
@@ -283,30 +295,33 @@ export const createVenta = async (req, res) => {
         item.descuento_porcentaje || 0, itemTotal
       ]);
 
-      // Obtener stock actual
-      const producto = await getOne(
-        'SELECT stock_actual FROM productos WHERE id = ?',
-        [item.producto_id]
+      // Obtener stock actual de la sucursal
+      const stockSucursal = await getOne(
+        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
+        [item.producto_id, user.sucursal_id]
       );
-      const stockAnterior = producto.stock_actual;
+      const stockAnterior = stockSucursal.stock_actual;
       const stockNuevo = stockAnterior - item.cantidad;
 
-      // Actualizar stock del producto
+      // Actualizar stock en la sucursal
       await runQuery(
-        'UPDATE productos SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [stockNuevo, item.producto_id]
+        'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
+        [stockNuevo, item.producto_id, user.sucursal_id]
       );
 
-      // Registrar movimiento de stock
+      // Registrar movimiento de stock con sucursal_id
       await runQuery(`
         INSERT INTO movimientos_stock (
           producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-          motivo, venta_id, usuario_id, fecha
-        ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          motivo, venta_id, usuario_id, sucursal_id, fecha
+        ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `, [
         item.producto_id, item.cantidad, stockAnterior, stockNuevo,
-        `Venta ${numero_comprobante}`, ventaId, usuario_id
+        `Venta ${numero_comprobante}`, ventaId, usuario_id, user.sucursal_id
       ]);
+
+      // Actualizar stock total del producto
+      await actualizarStockTotal(item.producto_id);
     }
 
     // Si la venta proviene de un presupuesto, marcarlo como convertido
@@ -337,7 +352,6 @@ export const createVenta = async (req, res) => {
         const saldoAnterior = cliente.saldo_cuenta_corriente;
         const saldoNuevo = saldoAnterior + parseFloat(pago.monto);
 
-        // Registrar movimiento de débito (deuda)
         await runQuery(`
           INSERT INTO cuenta_corriente (
             cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
@@ -348,7 +362,6 @@ export const createVenta = async (req, res) => {
           `Venta ${numero_comprobante}`, ventaId, fecha, usuario_id
         ]);
 
-        // Actualizar saldo del cliente
         await runQuery(
           'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
           [saldoNuevo, cliente_id]
@@ -357,14 +370,12 @@ export const createVenta = async (req, res) => {
 
       // Si es efectivo, registrar en caja abierta
       if (pago.forma_pago === 'efectivo') {
-        // Buscar caja abierta del usuario
         const cajaAbierta = await getOne(
           'SELECT id FROM cajas WHERE usuario_apertura_id = ? AND estado = ? ORDER BY fecha_apertura DESC LIMIT 1',
           [usuario_id, 'abierta']
         );
 
         if (cajaAbierta) {
-          // Registrar movimiento de ingreso en caja
           await runQuery(`
             INSERT INTO movimientos_caja (
               caja_id, tipo_movimiento, categoria, monto, concepto,
@@ -375,7 +386,6 @@ export const createVenta = async (req, res) => {
             `Venta ${numero_comprobante}`, ventaId, numero_comprobante, usuario_id
           ]);
 
-          // Actualizar totales de la caja
           await runQuery(`
             UPDATE cajas SET 
               total_ingresos = total_ingresos + ?
@@ -407,7 +417,7 @@ export const anularVenta = async (req, res) => {
     const { usuario_id } = req.body;
 
     const venta = await getOne(
-      'SELECT id, estado, numero_comprobante, cliente_id, total, forma_pago FROM ventas WHERE id = ?',
+      'SELECT id, estado, numero_comprobante, cliente_id, total, forma_pago, sucursal_id FROM ventas WHERE id = ?',
       [id]
     );
 
@@ -425,30 +435,36 @@ export const anularVenta = async (req, res) => {
       [id]
     );
 
-    // Devolver stock
+    // ========== DEVOLVER STOCK A LA SUCURSAL ==========
     for (const item of detalle) {
-      const producto = await getOne(
-        'SELECT stock_actual FROM productos WHERE id = ?',
-        [item.producto_id]
-      );
-      const stockAnterior = producto.stock_actual;
-      const stockNuevo = stockAnterior + item.cantidad;
-
-      await runQuery(
-        'UPDATE productos SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [stockNuevo, item.producto_id]
+      const stockSucursal = await getOne(
+        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
+        [item.producto_id, venta.sucursal_id]
       );
 
-      // Registrar movimiento de stock
-      await runQuery(`
-        INSERT INTO movimientos_stock (
-          producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-          motivo, venta_id, usuario_id, fecha
-        ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `, [
-        item.producto_id, item.cantidad, stockAnterior, stockNuevo,
-        `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
-      ]);
+      if (stockSucursal) {
+        const stockAnterior = stockSucursal.stock_actual;
+        const stockNuevo = stockAnterior + item.cantidad;
+
+        await runQuery(
+          'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
+          [stockNuevo, item.producto_id, venta.sucursal_id]
+        );
+
+        // Registrar movimiento de stock
+        await runQuery(`
+          INSERT INTO movimientos_stock (
+            producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
+            motivo, venta_id, usuario_id, sucursal_id, fecha
+          ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `, [
+          item.producto_id, item.cantidad, stockAnterior, stockNuevo,
+          `Anulación venta ${venta.numero_comprobante}`, id, usuario_id, venta.sucursal_id
+        ]);
+
+        // Actualizar stock total del producto
+        await actualizarStockTotal(item.producto_id);
+      }
     }
 
     // Revertir pagos en cuenta corriente
@@ -466,7 +482,6 @@ export const anularVenta = async (req, res) => {
       const saldoAnterior = cliente.saldo_cuenta_corriente;
       const saldoNuevo = saldoAnterior - parseFloat(pago.monto);
 
-      // Registrar movimiento de crédito (reversión)
       await runQuery(`
         INSERT INTO cuenta_corriente (
           cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
@@ -477,7 +492,6 @@ export const anularVenta = async (req, res) => {
         `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
       ]);
 
-      // Actualizar saldo del cliente
       await runQuery(
         'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
         [saldoNuevo, venta.cliente_id]
@@ -491,21 +505,18 @@ export const anularVenta = async (req, res) => {
     );
 
     for (const pago of pagosEfectivo) {
-      // Buscar el movimiento de caja relacionado
       const movimientoCaja = await getOne(
         'SELECT caja_id, monto FROM movimientos_caja WHERE venta_id = ? AND tipo_movimiento = ?',
         [id, 'ingreso']
       );
 
       if (movimientoCaja) {
-        // Verificar que la caja esté abierta
         const caja = await getOne(
           'SELECT estado FROM cajas WHERE id = ?',
           [movimientoCaja.caja_id]
         );
 
         if (caja && caja.estado === 'abierta') {
-          // Registrar movimiento de egreso (reversión)
           await runQuery(`
             INSERT INTO movimientos_caja (
               caja_id, tipo_movimiento, categoria, monto, concepto,
@@ -516,7 +527,6 @@ export const anularVenta = async (req, res) => {
             `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
           ]);
 
-          // Actualizar totales de la caja
           await runQuery(`
             UPDATE cajas SET 
               total_egresos = total_egresos + ?

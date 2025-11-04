@@ -1,4 +1,5 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { actualizarStockTotal } from './stockSucursalesController.js';
 
 // Obtener todas las compras (con búsqueda y filtros)
 export const getCompras = async (req, res) => {
@@ -233,7 +234,7 @@ export const createCompra = async (req, res) => {
 
     const compraId = result.id;
 
-    // Insertar detalle y actualizar stock
+    // ========== ACTUALIZAR STOCK POR SUCURSAL ==========
     for (const item of detalle) {
       const itemSubtotal = item.cantidad * item.precio_unitario;
       const itemDescuentoMonto = itemSubtotal * (item.descuento_porcentaje || 0) / 100;
@@ -251,35 +252,50 @@ export const createCompra = async (req, res) => {
         item.descuento_porcentaje || 0, itemTotal
       ]);
 
-      // Obtener stock actual
-      const producto = await getOne(
-        'SELECT stock_actual FROM productos WHERE id = ?',
-        [item.producto_id]
+      // Verificar si existe stock para este producto en esta sucursal
+      let stockSucursal = await getOne(
+        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
+        [item.producto_id, user.sucursal_id]
       );
-      const stockAnterior = producto.stock_actual;
+
+      let stockAnterior = 0;
+      
+      if (!stockSucursal) {
+        // Si no existe, crear el registro
+        await runQuery(`
+          INSERT INTO stock_sucursales (producto_id, sucursal_id, stock_actual)
+          VALUES (?, ?, 0)
+        `, [item.producto_id, user.sucursal_id]);
+        stockAnterior = 0;
+      } else {
+        stockAnterior = stockSucursal.stock_actual;
+      }
+
       const stockNuevo = stockAnterior + item.cantidad;
 
-      // Actualizar stock del producto
+      // Actualizar stock en la sucursal
       await runQuery(
-        'UPDATE productos SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [stockNuevo, item.producto_id]
+        'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
+        [stockNuevo, item.producto_id, user.sucursal_id]
       );
 
-      // Registrar movimiento de stock
+      // Registrar movimiento de stock con sucursal_id
       await runQuery(`
         INSERT INTO movimientos_stock (
           producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-          motivo, compra_id, usuario_id, fecha
-        ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          motivo, compra_id, usuario_id, sucursal_id, fecha
+        ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `, [
         item.producto_id, item.cantidad, stockAnterior, stockNuevo,
-        `Compra ${numero_comprobante}`, compraId, usuario_id
+        `Compra ${numero_comprobante}`, compraId, usuario_id, user.sucursal_id
       ]);
 
-      // Actualizar precio de costo (opcional: solo si quieres actualizar el costo promedio)
-      // Esto es útil para calcular márgenes de ganancia
+      // Actualizar stock total del producto
+      await actualizarStockTotal(item.producto_id);
+
+      // Actualizar precio de costo
       await runQuery(
-        'UPDATE productos SET precio_costo = ? WHERE id = ?',
+        'UPDATE productos SET precio_costo = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
         [item.precio_unitario, item.producto_id]
       );
     }
@@ -330,7 +346,7 @@ export const anularCompra = async (req, res) => {
     const { usuario_id } = req.body;
 
     const compra = await getOne(
-      'SELECT id, estado, numero_comprobante FROM compras WHERE id = ?',
+      'SELECT id, estado, numero_comprobante, sucursal_id FROM compras WHERE id = ?',
       [id]
     );
 
@@ -348,36 +364,46 @@ export const anularCompra = async (req, res) => {
       [id]
     );
 
-    // Revertir stock
+    // ========== REVERTIR STOCK EN LA SUCURSAL ==========
     for (const item of detalle) {
-      const producto = await getOne(
-        'SELECT stock_actual FROM productos WHERE id = ?',
-        [item.producto_id]
+      const stockSucursal = await getOne(
+        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
+        [item.producto_id, compra.sucursal_id]
       );
-      const stockAnterior = producto.stock_actual;
+
+      if (!stockSucursal) {
+        return res.status(400).json({ 
+          error: 'No se puede anular: no hay registro de stock para este producto en la sucursal' 
+        });
+      }
+
+      const stockAnterior = stockSucursal.stock_actual;
       const stockNuevo = stockAnterior - item.cantidad;
 
       if (stockNuevo < 0) {
         return res.status(400).json({ 
-          error: 'No se puede anular: el stock resultante sería negativo' 
+          error: 'No se puede anular: el stock resultante sería negativo en la sucursal' 
         });
       }
 
       await runQuery(
-        'UPDATE productos SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [stockNuevo, item.producto_id]
+        'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
+        [stockNuevo, item.producto_id, compra.sucursal_id]
       );
 
       // Registrar movimiento de stock
       await runQuery(`
         INSERT INTO movimientos_stock (
           producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-          motivo, compra_id, usuario_id, fecha
-        ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          motivo, compra_id, usuario_id, sucursal_id, fecha
+        ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `, [
         item.producto_id, item.cantidad, stockAnterior, stockNuevo,
-        `Anulación compra ${compra.numero_comprobante}`, id, usuario_id
+        `Anulación compra ${compra.numero_comprobante}`, id, usuario_id, compra.sucursal_id
       ]);
+
+      // Actualizar stock total del producto
+      await actualizarStockTotal(item.producto_id);
     }
 
     // Marcar compra como anulada
