@@ -9,9 +9,10 @@ export const getProductos = async (req, res) => {
     let sql = '';
     let params = [];
 
-    // ========== CONSULTA SEGÚN ROL ==========
-    if (user.rol !== 'admin') {
-      // NO-ADMIN: Mostrar stock de su sucursal
+    // ========== CONSULTA SEGÚN ROL Y SUCURSAL ==========
+    // Si NO es admin O si es admin CON sucursal activa → mostrar stock de sucursal
+    if (user.rol !== 'admin' || user.sucursal_id) {
+      // Verificar que tenga sucursal
       if (!user.sucursal_id) {
         return res.status(400).json({ 
           error: 'Usuario no tiene sucursal asignada' 
@@ -32,7 +33,7 @@ export const getProductos = async (req, res) => {
       `;
       params.push(user.sucursal_id);
     } else {
-      // ADMIN: Mostrar stock total
+      // Admin SIN sucursal activa → Mostrar stock total
       sql = `
         SELECT p.*, 
                c.nombre as categoria_nombre,
@@ -66,7 +67,7 @@ export const getProductos = async (req, res) => {
 
     // Filtro por stock bajo
     if (stock_bajo === 'true') {
-      if (user.rol !== 'admin') {
+      if (user.rol !== 'admin' || user.sucursal_id) {
         sql += ` AND COALESCE(ss.stock_actual, 0) <= p.stock_minimo`;
       } else {
         sql += ` AND p.stock_actual <= p.stock_minimo`;
@@ -92,9 +93,9 @@ export const getProductoById = async (req, res) => {
     let sql = '';
     let params = [];
 
-    // ========== CONSULTA SEGÚN ROL ==========
-    if (user.rol !== 'admin') {
-      // NO-ADMIN: Mostrar stock de su sucursal
+    // ========== CONSULTA SEGÚN ROL Y SUCURSAL ==========
+    // Si NO es admin O si es admin CON sucursal activa → mostrar stock de sucursal
+    if (user.rol !== 'admin' || user.sucursal_id) {
       if (!user.sucursal_id) {
         return res.status(400).json({ 
           error: 'Usuario no tiene sucursal asignada' 
@@ -114,7 +115,7 @@ export const getProductoById = async (req, res) => {
       `;
       params = [user.sucursal_id, id];
     } else {
-      // ADMIN: Mostrar stock total
+      // Admin SIN sucursal activa → Mostrar stock total
       sql = `
         SELECT p.*, 
                c.nombre as categoria_nombre,
@@ -144,9 +145,9 @@ export const getProductoById = async (req, res) => {
       [id]
     );
 
-    // Si es admin, agregar información de stock por sucursal
+    // Si es admin SIN sucursal activa, agregar información de stock por sucursal
     let stockPorSucursal = [];
-    if (user.rol === 'admin') {
+    if (user.rol === 'admin' && !user.sucursal_id) {
       stockPorSucursal = await getAll(`
         SELECT ss.*, s.nombre as sucursal_nombre, s.codigo as sucursal_codigo
         FROM stock_sucursales ss
@@ -160,7 +161,7 @@ export const getProductoById = async (req, res) => {
       producto: { 
         ...producto, 
         precios,
-        ...(user.rol === 'admin' && { stock_por_sucursal: stockPorSucursal })
+        ...(stockPorSucursal.length > 0 && { stock_por_sucursal: stockPorSucursal })
       } 
     });
   } catch (error) {

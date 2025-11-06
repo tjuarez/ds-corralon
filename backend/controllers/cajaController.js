@@ -20,7 +20,7 @@ export const getCajas = async (req, res) => {
     const params = [];
 
     // FILTRO CRÍTICO: Control por sucursal
-    if (user.rol !== 'admin') {
+    if (user.rol !== 'admin' || user.sucursal_id) {
       // No-admin: SOLO puede ver cajas de su sucursal
       if (!user.sucursal_id) {
         return res.status(400).json({ 

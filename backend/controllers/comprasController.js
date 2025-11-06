@@ -24,7 +24,7 @@ export const getCompras = async (req, res) => {
     const params = [];
 
     // FILTRO CRÍTICO: Control por sucursal
-    if (user.rol !== 'admin') {
+    if (user.rol !== 'admin' || user.sucursal_id) {
       // No-admin: SOLO puede ver compras de su sucursal
       if (!user.sucursal_id) {
         return res.status(400).json({ 
