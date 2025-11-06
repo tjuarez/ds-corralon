@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { productosApi } from '../api/productos';
 import Layout from '../components/Layout';
-import { ArrowLeft, Edit, Trash2, Package, AlertTriangle, DollarSign, Layers, MapPin, Tag } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Package, AlertTriangle, DollarSign, Layers, MapPin, Tag, Building2 } from 'lucide-react';
 
 const ProductoDetalle = () => {
   const navigate = useNavigate();
@@ -60,6 +60,15 @@ const ProductoDetalle = () => {
       return { color: '#f59e0b', label: t('lowStockAlert'), icon: AlertTriangle };
     }
     return { color: '#10b981', label: 'Stock OK', icon: Package };
+  };
+
+  const getStockStatusForValue = (stock, minimo) => {
+    if (stock === 0) {
+      return { color: '#dc2626', label: 'Sin stock' };
+    } else if (stock <= minimo) {
+      return { color: '#f59e0b', label: 'Stock bajo' };
+    }
+    return { color: '#10b981', label: 'Stock OK' };
   };
 
   const groupPreciosByMoneda = () => {
@@ -210,7 +219,9 @@ const ProductoDetalle = () => {
             <div style={styles.stockHeader}>
               <StatusIcon size={32} color={stockStatus.color} />
               <div style={{ flex: 1 }}>
-                <div style={styles.stockLabel}>Stock Actual</div>
+                <div style={styles.stockLabel}>
+                  {producto.stock_por_sucursal ? 'Stock Total' : 'Stock Actual'}
+                </div>
                 <div style={{
                   ...styles.stockValue,
                   color: stockStatus.color
@@ -236,6 +247,80 @@ const ProductoDetalle = () => {
               </div>
             )}
           </div>
+
+          {/* Stock por Sucursal - Solo para admin con "Todas las sucursales" */}
+          {producto.stock_por_sucursal && producto.stock_por_sucursal.length > 0 && (
+            <div style={styles.sucursalesStockContainer}>
+              <div style={styles.sucursalesStockHeader}>
+                <Building2 size={20} color="#2563eb" />
+                <h3 style={styles.sucursalesStockTitle}>Stock por Sucursal</h3>
+              </div>
+
+              <div style={styles.sucursalesTable}>
+                <div style={styles.tableHeader}>
+                  <div style={styles.tableHeaderCell}>Sucursal</div>
+                  <div style={styles.tableHeaderCell}>Stock Actual</div>
+                  <div style={styles.tableHeaderCell}>Stock Mínimo</div>
+                  <div style={styles.tableHeaderCell}>Estado</div>
+                </div>
+
+                {producto.stock_por_sucursal.map((stock) => {
+                  const status = getStockStatusForValue(
+                    parseFloat(stock.stock_actual),
+                    parseFloat(stock.stock_minimo || 0)
+                  );
+
+                  return (
+                    <div key={stock.id} style={styles.tableRow}>
+                      <div style={styles.tableCell}>
+                        <div style={styles.sucursalName}>
+                          {stock.sucursal_nombre}
+                        </div>
+                        {stock.sucursal_codigo && (
+                          <div style={styles.sucursalCode}>
+                            {stock.sucursal_codigo}
+                          </div>
+                        )}
+                      </div>
+                      <div style={styles.tableCell}>
+                        <span style={styles.stockAmount}>
+                          {stock.stock_actual} {producto.unidad_medida}
+                        </span>
+                      </div>
+                      <div style={styles.tableCell}>
+                        <span style={styles.stockMinAmount}>
+                          {stock.stock_minimo || 0} {producto.unidad_medida}
+                        </span>
+                      </div>
+                      <div style={styles.tableCell}>
+                        <span style={{
+                          ...styles.statusBadge,
+                          backgroundColor: status.color + '20',
+                          color: status.color,
+                        }}>
+                          {status.label}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Total */}
+                <div style={styles.tableTotalRow}>
+                  <div style={styles.tableCell}>
+                    <strong>TOTAL</strong>
+                  </div>
+                  <div style={styles.tableCell}>
+                    <strong style={styles.totalAmount}>
+                      {producto.stock_actual} {producto.unidad_medida}
+                    </strong>
+                  </div>
+                  <div style={styles.tableCell}></div>
+                  <div style={styles.tableCell}></div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Precios */}
@@ -529,6 +614,91 @@ const styles = {
     marginTop: '16px',
     paddingTop: '16px',
     borderTop: '1px solid #e5e7eb',
+  },
+  // Nuevos estilos para Stock por Sucursal
+  sucursalesStockContainer: {
+    marginTop: '24px',
+    padding: '24px',
+    backgroundColor: '#eff6ff',
+    borderRadius: '8px',
+    border: '2px solid #bfdbfe',
+  },
+  sucursalesStockHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '20px',
+  },
+  sucursalesStockTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#1e40af',
+    margin: 0,
+  },
+  sucursalesTable: {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    overflow: 'hidden',
+    border: '1px solid #e5e7eb',
+  },
+  tableHeader: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr',
+    backgroundColor: '#f9fafb',
+    borderBottom: '2px solid #e5e7eb',
+  },
+  tableHeaderCell: {
+    padding: '14px 16px',
+    fontSize: '13px',
+    fontWeight: '700',
+    color: '#374151',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+  },
+  tableRow: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr',
+    borderBottom: '1px solid #e5e7eb',
+    transition: 'background-color 0.2s',
+  },
+  tableTotalRow: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr',
+    backgroundColor: '#f9fafb',
+    borderTop: '2px solid #e5e7eb',
+  },
+  tableCell: {
+    padding: '14px 16px',
+    fontSize: '14px',
+    color: '#1f2937',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  sucursalName: {
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  sucursalCode: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '2px',
+  },
+  stockAmount: {
+    fontWeight: '600',
+    fontSize: '15px',
+  },
+  stockMinAmount: {
+    color: '#6b7280',
+  },
+  totalAmount: {
+    fontSize: '16px',
+    color: '#2563eb',
+  },
+  statusBadge: {
+    padding: '4px 12px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600',
   },
   preciosContainer: {
     display: 'flex',
