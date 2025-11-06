@@ -40,6 +40,7 @@ import Sucursales from '../pages/Sucursales';
 import SucursalForm from '../pages/SucursalForm';
 import Usuarios from '../pages/Usuarios';
 import UsuarioForm from '../pages/UsuarioForm';
+import Configuracion from '../pages/Configuracion';
 
 const AppRoutes = () => {
   return (
@@ -202,6 +203,8 @@ const AppRoutes = () => {
       <Route path="/usuarios" element={<Usuarios />} />
       <Route path="/usuarios/nuevo" element={<UsuarioForm />} />
       <Route path="/usuarios/:id/editar" element={<UsuarioForm />} />
+
+      <Route path="/configuracion" element={<Configuracion />} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

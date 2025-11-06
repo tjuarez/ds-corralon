@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -24,10 +24,33 @@ import {
 
 const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [logoEmpresa, setLogoEmpresa] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { t, language, setLanguage } = useLanguage();
+
+  // Cargar logo de la empresa
+  useEffect(() => {
+    loadLogo();
+  }, []);
+
+  const loadLogo = async () => {
+    try {
+      const response = await fetch('/api/configuracion/empresa_logo_url', {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.configuracion?.valor) {
+          setLogoEmpresa(data.configuracion.valor);
+        }
+      }
+    } catch (error) {
+      console.error('Error al cargar logo:', error);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -85,9 +108,29 @@ const Layout = ({ children }) => {
         ...styles.sidebar,
         width: sidebarOpen ? '260px' : '70px',
       }}>
-        <div style={styles.sidebarHeader}>
+<div style={styles.sidebarHeader}>
           {sidebarOpen ? (
-            <h1 style={styles.logo}>{t('appName')}</h1>
+            <div style={styles.logoContainer}>
+              {logoEmpresa ? (
+                <img 
+                  src={logoEmpresa} 
+                  alt="Logo" 
+                  style={styles.logoImage}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'block';
+                  }}
+                />
+              ) : null}
+              <h1 
+                style={{
+                  ...styles.logo,
+                  display: logoEmpresa ? 'none' : 'block'
+                }}
+              >
+                {t('appName')}
+              </h1>
+            </div>
           ) : (
             <h1 style={styles.logoCollapsed}>DS</h1>
           )}
@@ -377,6 +420,17 @@ const styles = {
     flex: 1,
     padding: '30px',
     overflowY: 'auto',
+  },
+logoContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  logoImage: {
+    maxWidth: '180px',
+    maxHeight: '50px',
+    objectFit: 'contain',
   },
 };
 

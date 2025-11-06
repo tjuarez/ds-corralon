@@ -1,5 +1,6 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
 import { actualizarStockTotal } from './stockSucursalesController.js';
+import { getCotizacionActual } from '../utils/cotizacion.js';
 
 // Obtener todas las compras (con búsqueda y filtros)
 export const getCompras = async (req, res) => {
@@ -95,7 +96,8 @@ export const getCompraById = async (req, res) => {
              m.codigo as moneda_codigo,
              m.simbolo as moneda_simbolo,
              u.nombre || ' ' || u.apellido as usuario_nombre,
-             s.nombre as sucursal_nombre
+             s.nombre as sucursal_nombre,
+             c.cotizacion_momento
       FROM compras c
       LEFT JOIN proveedores p ON c.proveedor_id = p.id
       LEFT JOIN monedas m ON c.moneda_id = m.id
@@ -205,6 +207,10 @@ export const createCompra = async (req, res) => {
       }
     }
 
+    // ========== OBTENER COTIZACIÓN DEL MOMENTO ==========
+    const cotizacionMomento = await getCotizacionActual();
+    console.log(`💱 Cotización del momento: ${cotizacionMomento}`);
+
     // Calcular totales
     let subtotal = 0;
     for (const item of detalle) {
@@ -224,12 +230,12 @@ export const createCompra = async (req, res) => {
       INSERT INTO compras (
         numero_comprobante, numero_factura, tipo_comprobante, proveedor_id, 
         fecha, moneda_id, subtotal, descuento_porcentaje, descuento_monto, 
-        total, forma_pago, estado, observaciones, usuario_id, sucursal_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'recibida', ?, ?, ?)
+        total, forma_pago, estado, observaciones, usuario_id, sucursal_id, cotizacion_momento
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'recibida', ?, ?, ?, ?)
     `, [
       numero_comprobante, numero_factura, tipo_comprobante, proveedor_id,
       fecha, moneda_id, subtotal, descuento_porcentaje || 0, descuentoMonto, 
-      total, forma_pago, observaciones, usuario_id, user.sucursal_id
+      total, forma_pago, observaciones, usuario_id, user.sucursal_id, cotizacionMomento
     ]);
 
     const compraId = result.id;

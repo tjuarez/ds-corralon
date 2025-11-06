@@ -20,7 +20,8 @@ import cajaRoutes from './backend/routes/caja.js';
 import reportesRoutes from './backend/routes/reportes.js';
 import sucursalesRoutes from './backend/routes/sucursales.js';
 import usuariosRoutes from './backend/routes/usuarios.js';
-import stockSucursalesRoutes from './backend/routes/stockSucursales.js'; // ← NUEVA RUTA
+import stockSucursalesRoutes from './backend/routes/stockSucursales.js';
+import configuracionRoutes from './backend/routes/configuracion.js';
 
 // Configuración de variables de entorno
 dotenv.config();
@@ -66,7 +67,8 @@ app.use('/api/caja', cajaRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/sucursales', sucursalesRoutes);
 app.use('/api/usuarios', usuariosRoutes);
-app.use('/api/stock-sucursales', stockSucursalesRoutes); // ← NUEVA RUTA
+app.use('/api/stock-sucursales', stockSucursalesRoutes);
+app.use('/api/configuracion', configuracionRoutes);
 
 // En producción, servir el frontend compilado
 if (process.env.NODE_ENV === 'production') {

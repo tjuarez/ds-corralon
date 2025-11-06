@@ -1,5 +1,6 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
 import { enviarPresupuestoPorEmail } from '../services/emailService.js';
+import { getCotizacionActual } from '../utils/cotizacion.js';
 
 // Obtener todos los presupuestos (con búsqueda y filtros)
 export const getPresupuestos = async (req, res) => {
@@ -75,7 +76,8 @@ export const getPresupuestoById = async (req, res) => {
              c.email as cliente_email,
              m.codigo as moneda_codigo,
              m.simbolo as moneda_simbolo,
-             u.nombre || ' ' || u.apellido as usuario_nombre
+             u.nombre || ' ' || u.apellido as usuario_nombre,
+             p.cotizacion_momento
       FROM presupuestos p
       LEFT JOIN clientes c ON p.cliente_id = c.id
       LEFT JOIN monedas m ON p.moneda_id = m.id
@@ -172,6 +174,10 @@ export const createPresupuesto = async (req, res) => {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
+// ========== OBTENER COTIZACIÓN DEL MOMENTO ==========
+    const cotizacionMomento = await getCotizacionActual();
+    console.log(`💱 Cotización del momento: ${cotizacionMomento}`);
+
     // Calcular totales
     let subtotal = 0;
     for (const item of detalle) {
@@ -191,12 +197,12 @@ export const createPresupuesto = async (req, res) => {
       INSERT INTO presupuestos (
         numero, cliente_id, fecha, fecha_vencimiento, moneda_id,
         subtotal, descuento_porcentaje, descuento_monto, impuestos, total,
-        estado, observaciones, usuario_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'pendiente', ?, ?)
+        estado, observaciones, usuario_id, cotizacion_momento
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'pendiente', ?, ?, ?)
     `, [
       numero, cliente_id, fecha, fecha_vencimiento, moneda_id,
       subtotal, descuento_porcentaje || 0, descuentoMonto, total,
-      observaciones, usuario_id
+      observaciones, usuario_id, cotizacionMomento
     ]);
 
     const presupuestoId = result.id;

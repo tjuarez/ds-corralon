@@ -567,15 +567,42 @@ const seedData = async () => {
     // 5. Insertar configuración básica
     await runQuery(`
       INSERT OR IGNORE INTO configuracion (clave, valor, tipo, descripcion) VALUES
-      ('nombre_empresa', 'Mi Corralón', 'string', 'Nombre del corralón'),
-      ('cuit', '', 'string', 'CUIT de la empresa'),
-      ('direccion', '', 'string', 'Dirección principal'),
-      ('telefono', '', 'string', 'Teléfono de contacto'),
-      ('email', '', 'string', 'Email de contacto'),
+      -- Datos de la Empresa
+      ('empresa_razon_social', 'Mi Corralón', 'string', 'Razón social de la empresa'),
+      ('empresa_nombre_fantasia', 'Corralón Central', 'string', 'Nombre de fantasía'),
+      ('empresa_cuit', '', 'string', 'CUIT de la empresa'),
+      ('empresa_condicion_iva', 'responsable_inscripto', 'string', 'Condición frente a IVA'),
+      ('empresa_direccion', '', 'string', 'Dirección fiscal'),
+      ('empresa_pais', 'Argentina', 'string', 'País'),
+      ('empresa_provincia', 'Buenos Aires', 'string', 'Provincia'),
+      ('empresa_ciudad', '', 'string', 'Ciudad'),
+      ('empresa_codigo_postal', '', 'string', 'Código postal'),
+      ('empresa_telefono', '', 'string', 'Teléfono de contacto'),
+      ('empresa_email', '', 'string', 'Email de contacto'),
+      ('empresa_sitio_web', '', 'string', 'Sitio web'),
+      ('empresa_logo_url', '', 'string', 'URL del logo de la empresa'),
+      
+      -- Configuración de Facturación
+      ('facturacion_punto_venta', '1', 'number', 'Punto de venta predeterminado'),
+      ('facturacion_proximo_numero_fa', '1', 'number', 'Próximo número de Factura A'),
+      ('facturacion_proximo_numero_fb', '1', 'number', 'Próximo número de Factura B'),
+      ('facturacion_proximo_numero_fc', '1', 'number', 'Próximo número de Factura C'),
+      ('facturacion_proximo_numero_rem', '1', 'number', 'Próximo número de Remito'),
+      ('facturacion_proximo_numero_tk', '1', 'number', 'Próximo número de Ticket'),
+      ('facturacion_pie_pagina', 'Gracias por su compra', 'string', 'Pie de página en facturas'),
+      ('facturacion_terminos', '', 'text', 'Términos y condiciones'),
+      ('facturacion_dias_validez_presupuesto', '15', 'number', 'Días de validez de presupuestos'),
+      
+      -- Monedas y Cotización
       ('moneda_principal', 'ARS', 'string', 'Moneda principal de operación'),
-      ('iva_porcentaje', '21', 'number', 'Porcentaje de IVA por defecto'),
+      ('cotizacion_usd_ars', '1000', 'number', 'Cotización USD a ARS'),
+      ('cotizacion_fecha_actualizacion', '', 'string', 'Fecha de última actualización de cotización'),
+      
+      -- Configuración General
+      ('iva_porcentaje_defecto', '21', 'number', 'Porcentaje de IVA por defecto'),
       ('puntos_por_peso', '1', 'number', 'Puntos de fidelización por cada peso gastado'),
-      ('logo_url', '', 'string', 'URL del logo de la empresa')
+      ('alerta_stock_bajo_activa', '1', 'boolean', 'Activar alertas de stock bajo'),
+      ('umbral_stock_bajo_porcentaje', '20', 'number', 'Porcentaje para considerar stock bajo')
     `);
 
     console.log('✅ Datos iniciales insertados correctamente');

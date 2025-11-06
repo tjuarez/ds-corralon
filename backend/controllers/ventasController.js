@@ -1,5 +1,6 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
 import { actualizarStockTotal } from './stockSucursalesController.js';
+import { getCotizacionActual } from '../utils/cotizacion.js';
 
 // Obtener todas las ventas (con búsqueda y filtros)
 export const getVentas = async (req, res) => {
@@ -92,7 +93,8 @@ export const getVentaById = async (req, res) => {
              c.email as cliente_email,
              m.codigo as moneda_codigo,
              m.simbolo as moneda_simbolo,
-             u.nombre || ' ' || u.apellido as usuario_nombre
+             u.nombre || ' ' || u.apellido as usuario_nombre,
+             v.cotizacion_momento
       FROM ventas v
       LEFT JOIN clientes c ON v.cliente_id = c.id
       LEFT JOIN monedas m ON v.moneda_id = m.id
@@ -237,6 +239,10 @@ export const createVenta = async (req, res) => {
       }
     }
 
+    // ========== OBTENER COTIZACIÓN DEL MOMENTO ==========
+    const cotizacionMomento = await getCotizacionActual();
+    console.log(`💱 Cotización del momento: ${cotizacionMomento}`);
+
     // Calcular totales
     let subtotal = 0;
     for (const item of detalle) {
@@ -267,12 +273,12 @@ export const createVenta = async (req, res) => {
       INSERT INTO ventas (
         numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
         subtotal, descuento_porcentaje, descuento_monto, impuestos, total,
-        forma_pago, estado, observaciones, presupuesto_id, usuario_id, sucursal_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?, ?)
+        forma_pago, estado, observaciones, presupuesto_id, usuario_id, sucursal_id, cotizacion_momento
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?, ?, ?)
     `, [
       numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
       subtotal, descuento_porcentaje || 0, descuentoMonto, 0, total,
-      formaPagoVenta, observaciones, presupuesto_id, usuario_id, user.sucursal_id
+      formaPagoVenta, observaciones, presupuesto_id, usuario_id, user.sucursal_id, cotizacionMomento
     ]);
 
     const ventaId = result.id;
