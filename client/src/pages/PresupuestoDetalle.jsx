@@ -480,6 +480,41 @@ const PresupuestoDetalle = () => {
                 })}
               </span>
             </div>
+
+            {/* Equivalencia en otra moneda */}
+            {presupuesto.cotizacion_momento && presupuesto.cotizacion_momento > 0 && (
+              <div style={styles.equivalenciaBox}>
+                <div style={styles.equivalenciaIcon}>≈</div>
+                <div style={styles.equivalenciaContent}>
+                  <div style={styles.equivalenciaLabel}>
+                    Equivalente aproximado:
+                  </div>
+                  <div style={styles.equivalenciaValue}>
+                    {presupuesto.moneda_codigo === 'USD' ? (
+                      <>
+                        $ {(parseFloat(presupuesto.total) * parseFloat(presupuesto.cotizacion_momento)).toLocaleString('es-AR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })} ARS
+                      </>
+                    ) : (
+                      <>
+                        US$ {(parseFloat(presupuesto.total) / parseFloat(presupuesto.cotizacion_momento)).toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}
+                      </>
+                    )}
+                  </div>
+                  <div style={styles.cotizacionInfo}>
+                    Cotización del momento: ${parseFloat(presupuesto.cotizacion_momento).toLocaleString('es-AR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })} ARS = 1 USD
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -981,6 +1016,41 @@ const styles = {
     transition: 'all 0.2s',
     display: 'flex',
     alignItems: 'center',
+  },
+  equivalenciaBox: {
+    marginTop: '20px',
+    padding: '16px',
+    backgroundColor: '#eff6ff',
+    borderRadius: '8px',
+    border: '2px solid #bfdbfe',
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'center',
+  },
+  equivalenciaIcon: {
+    fontSize: '32px',
+    fontWeight: 'bold',
+    color: '#2563eb',
+    lineHeight: '1',
+  },
+  equivalenciaContent: {
+    flex: 1,
+  },
+  equivalenciaLabel: {
+    fontSize: '13px',
+    color: '#6b7280',
+    marginBottom: '4px',
+  },
+  equivalenciaValue: {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    color: '#1e40af',
+    marginBottom: '4px',
+  },
+  cotizacionInfo: {
+    fontSize: '12px',
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
 };
 

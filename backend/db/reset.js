@@ -26,6 +26,14 @@ const resetDatabase = async () => {
     const { stdout: seedOutput } = await execAsync('node backend/db/seed.js');
     console.log(seedOutput);
 
+    // Paso 3: Inicializar stock por sucursal
+    console.log('═══════════════════════════════════════');
+    console.log('PASO 3: Cargando datos de stock para las sucursales...');
+    console.log('═══════════════════════════════════════\n');
+    
+    const { stdout: stockOutput } = await execAsync('node backend/db/inicializar-stock-sucursales.js');
+    console.log(stockOutput);
+
     console.log('═══════════════════════════════════════');
     console.log('✅ RESET COMPLETADO EXITOSAMENTE');
     console.log('═══════════════════════════════════════');
