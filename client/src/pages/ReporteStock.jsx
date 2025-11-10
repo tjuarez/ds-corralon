@@ -2,29 +2,53 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
 import { reportesApi } from '../api/reportes';
 import Layout from '../components/Layout';
-import { ArrowLeft, Package, AlertTriangle, XCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Package, AlertTriangle, XCircle, CheckCircle, Building2 } from 'lucide-react';
 
 const ReporteStock = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { showError } = useNotification();
+  const { user, sucursalActiva } = useAuth();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [sucursales, setSucursales] = useState([]);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState('');
 
   useEffect(() => {
     loadReporte();
-  }, []);
+  }, [sucursalActiva]);
 
-  const loadReporte = async (tipo = 'todos') => {
+  const loadReporte = async (tipo = 'todos', sucursalId = null) => {
     try {
       setLoading(true);
-      const filters = tipo !== 'todos' ? { tipo } : {};
+      const filters = {};
+      
+      if (tipo !== 'todos') {
+        filters.tipo = tipo;
+      }
+
+      // Si no se especifica sucursal, usar la activa del contexto
+      if (sucursalId) {
+        filters.sucursal_id = sucursalId;
+      } else if (sucursalActiva) {
+        filters.sucursal_id = sucursalActiva.id;
+      }
+
       const reporteData = await reportesApi.getReporteStock(filters);
       setData(reporteData);
+      
+      if (reporteData.sucursales) {
+        setSucursales(reporteData.sucursales);
+      }
+
+      if (reporteData.sucursal_actual) {
+        setSucursalSeleccionada(reporteData.sucursal_actual.id);
+      }
     } catch (error) {
       showError(error.message);
     } finally {
@@ -34,7 +58,13 @@ const ReporteStock = () => {
 
   const handleFiltroChange = (tipo) => {
     setFiltroTipo(tipo);
-    loadReporte(tipo);
+    loadReporte(tipo, sucursalSeleccionada);
+  };
+
+  const handleSucursalChange = (e) => {
+    const sucursalId = e.target.value;
+    setSucursalSeleccionada(sucursalId);
+    loadReporte(filtroTipo, sucursalId);
   };
 
   const getEstadoBadge = (estadoStock) => {
@@ -61,12 +91,30 @@ const ReporteStock = () => {
     return estados[estadoStock] || estados.normal;
   };
 
+  // Agrupar productos por código (para mostrar múltiples sucursales)
+  const productosAgrupados = data?.productos.reduce((acc, producto) => {
+    if (!acc[producto.codigo]) {
+      acc[producto.codigo] = {
+        ...producto,
+        sucursales: []
+      };
+    }
+    acc[producto.codigo].sucursales.push({
+      sucursal_id: producto.sucursal_id,
+      sucursal_nombre: producto.sucursal_nombre,
+      stock_actual: producto.stock_actual,
+      stock_minimo: producto.stock_minimo,
+      estado_stock: producto.estado_stock
+    });
+    return acc;
+  }, {});
+
   return (
     <Layout>
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>{t('stockReport')}</h1>
-          <p style={styles.subtitle}>Estado actual del inventario</p>
+          <p style={styles.subtitle}>Estado actual del inventario por sucursal</p>
         </div>
         <button onClick={() => navigate('/dashboard')} style={styles.backButton}>
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -81,6 +129,28 @@ const ReporteStock = () => {
         </div>
       ) : data ? (
         <>
+          {/* Selector de sucursal (solo para admin con "Todas las sucursales") */}
+          {user?.rol === 'admin' && !sucursalActiva && sucursales.length > 0 && (
+            <div style={styles.filterBar}>
+              <div style={styles.filterGroup}>
+                <Building2 size={18} style={{ marginRight: '8px' }} />
+                <label style={styles.filterLabel}>Sucursal:</label>
+                <select
+                  value={sucursalSeleccionada}
+                  onChange={handleSucursalChange}
+                  style={styles.filterSelect}
+                >
+                  <option value="">Todas las sucursales</option>
+                  {sucursales.map(suc => (
+                    <option key={suc.id} value={suc.id}>
+                      {suc.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* Resumen */}
           <div style={styles.statsGrid}>
             <div 
@@ -158,7 +228,7 @@ const ReporteStock = () => {
               {filtroTipo === 'sin_stock' ? 'Productos Sin Stock' :
                filtroTipo === 'critico' ? 'Productos con Stock Crítico' :
                filtroTipo === 'normal' ? 'Productos con Stock Normal' :
-               'Todos los Productos'}
+               'Inventario por Sucursal'}
             </h2>
 
             {data.productos.length === 0 ? (
@@ -174,6 +244,7 @@ const ReporteStock = () => {
                       <th style={styles.th}>Código</th>
                       <th style={styles.th}>Producto</th>
                       <th style={styles.th}>Categoría</th>
+                      <th style={styles.th}>Sucursal</th>
                       <th style={styles.thCenter}>Stock Actual</th>
                       <th style={styles.thCenter}>Stock Mínimo</th>
                       <th style={styles.th}>Unidad</th>
@@ -185,7 +256,7 @@ const ReporteStock = () => {
                       const estadoBadge = getEstadoBadge(producto.estado_stock);
                       const Icon = estadoBadge.icon;
                       return (
-                        <tr key={producto.id} style={styles.tr}>
+                        <tr key={`${producto.id}-${producto.sucursal_id}`} style={styles.tr}>
                           <td style={styles.td}>
                             <span style={styles.codigo}>{producto.codigo}</span>
                           </td>
@@ -198,6 +269,9 @@ const ReporteStock = () => {
                             ) : (
                               <span style={styles.sinCategoria}>Sin categoría</span>
                             )}
+                          </td>
+                          <td style={styles.td}>
+                            <span style={styles.sucursal}>{producto.sucursal_nombre}</span>
                           </td>
                           <td style={styles.tdCenter}>
                             <strong style={{
@@ -265,6 +339,32 @@ const styles = {
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
+  },
+  filterBar: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    marginBottom: '20px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+  },
+  filterGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  filterLabel: {
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#374151',
+  },
+  filterSelect: {
+    padding: '10px 40px 10px 14px',
+    fontSize: '15px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    minWidth: '250px',
   },
   loading: {
     display: 'flex',
@@ -404,6 +504,14 @@ const styles = {
     fontSize: '12px',
     color: '#9ca3af',
     fontStyle: 'italic',
+  },
+  sucursal: {
+    padding: '4px 10px',
+    fontSize: '12px',
+    backgroundColor: '#dbeafe',
+    color: '#1e40af',
+    borderRadius: '12px',
+    fontWeight: '600',
   },
   estadoBadge: {
     padding: '6px 12px',
