@@ -3,15 +3,18 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { productosApi } from '../api/productos';
+import { configuracionApi } from '../api/configuracion';
 import Layout from '../components/Layout';
 import { proveedoresApi } from '../api/proveedores';
-import { ArrowLeft, Save, X, Plus, Trash2, Upload, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Save, X, Plus, Trash2, Upload, Link as LinkIcon, Calculator } from 'lucide-react';
+import { useAuth } from '../context/AuthContext'; 
 
 const ProductoForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { t } = useLanguage();
   const { showSuccess, showError } = useNotification();
+  const { user, sucursalActiva } = useAuth();
   const isEdit = !!id;
 
   const [loading, setLoading] = useState(false);
@@ -50,6 +53,12 @@ const ProductoForm = () => {
   const [imagenPreview, setImagenPreview] = useState('');
   const [uploadingImagen, setUploadingImagen] = useState(false);
 
+  const [cotizacion, setCotizacion] = useState(null);
+  const [loadingCotizacion, setLoadingCotizacion] = useState(true);
+  const [preciosSugeridos, setPreciosSugeridos] = useState({}); // Para almacenar sugerencias
+
+  const debeDeshabilitarStock = user?.rol === 'admin' && !sucursalActiva;
+
   useEffect(() => {
     loadCategorias();
     loadProveedores();
@@ -57,6 +66,64 @@ const ProductoForm = () => {
       loadProducto();
     }
   }, [id]);
+
+  useEffect(() => {
+    loadCotizacion();
+  }, []);
+
+  const loadCotizacion = async () => {
+    try {
+      setLoadingCotizacion(true);
+      const data = await configuracionApi.getCotizacionActual();
+      if (data.configuracion && data.configuracion.valor) {
+        setCotizacion(parseFloat(data.configuracion.valor));
+      }
+    } catch (error) {
+      console.error('Error al cargar cotización:', error);
+    } finally {
+      setLoadingCotizacion(false);
+    }
+  };
+
+  const calcularPrecioSugerido = (precio, monedaOrigenId, monedaDestinoId) => {
+    if (!precio || !cotizacion || cotizacion <= 0) return null;
+    
+    const precioNum = parseFloat(precio);
+    if (isNaN(precioNum) || precioNum <= 0) return null;
+
+    // Moneda 1 = ARS, Moneda 2 = USD
+    if (monedaOrigenId === 1 && monedaDestinoId === 2) {
+      // ARS a USD: dividir por cotización
+      return (precioNum / cotizacion).toFixed(2);
+    } else if (monedaOrigenId === 2 && monedaDestinoId === 1) {
+      // USD a ARS: multiplicar por cotización
+      return (precioNum * cotizacion).toFixed(2);
+    }
+    
+    return null;
+  };
+
+  const aplicarPrecioSugerido = (listaId, monedaId) => {
+    const key = `${listaId}-${monedaId}`;
+    const sugerido = preciosSugeridos[key];
+    
+    if (sugerido) {
+      const index = precios.findIndex(
+        p => p.lista_precio_id === listaId && p.moneda_id === monedaId
+      );
+      
+      if (index !== -1) {
+        handlePrecioChange(index, sugerido);
+        
+        // Limpiar la sugerencia después de aplicarla
+        setPreciosSugeridos(prev => {
+          const newSugeridos = { ...prev };
+          delete newSugeridos[key];
+          return newSugeridos;
+        });
+      }
+    }
+  };
 
   const loadCategorias = async () => {
     try {
@@ -129,6 +196,39 @@ const ProductoForm = () => {
     const newPrecios = [...precios];
     newPrecios[index].precio = value;
     setPrecios(newPrecios);
+
+    // Calcular sugerencias para la otra moneda en la misma lista
+    const precioActual = newPrecios[index];
+    const listaId = precioActual.lista_precio_id;
+    const monedaActualId = precioActual.moneda_id;
+    const otraMonedaId = monedaActualId === 1 ? 2 : 1;
+
+    // Buscar el índice del precio en la otra moneda para la misma lista
+    const otraMonedaIndex = precios.findIndex(
+      p => p.lista_precio_id === listaId && p.moneda_id === otraMonedaId
+    );
+
+    // SOLO sugerir si el campo de la otra moneda está VACÍO
+    if (otraMonedaIndex !== -1 && value && !newPrecios[otraMonedaIndex].precio) {
+      const sugerido = calcularPrecioSugerido(value, monedaActualId, otraMonedaId);
+      
+      if (sugerido) {
+        // Guardar la sugerencia
+        setPreciosSugeridos(prev => ({
+          ...prev,
+          [`${listaId}-${otraMonedaId}`]: sugerido
+        }));
+      }
+    } else {
+      // Limpiar sugerencia si:
+      // - Se borra el precio origen
+      // - Ya hay un precio en destino
+      setPreciosSugeridos(prev => {
+        const newSugeridos = { ...prev };
+        delete newSugeridos[`${listaId}-${otraMonedaId}`];
+        return newSugeridos;
+      });
+    }
   };
 
   const handleCreateCategory = async () => {
@@ -452,18 +552,35 @@ const ProductoForm = () => {
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Control de Stock</h2>
 
+          {debeDeshabilitarStock && !isEdit && (
+            <div style={styles.warningBox}>
+              <span>ℹ️</span>
+              <div>
+                <strong>Stock deshabilitado</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>
+                  Para asignar stock inicial, selecciona una sucursal específica en el menú superior. 
+                  También puedes crear el producto sin stock y realizar ajustes después.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div style={styles.grid3}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Stock Actual</label>
               <input
                 type="number"
                 name="stock_actual"
-                value={formData.stock_actual}
+                value={debeDeshabilitarStock && !isEdit ? '0' : formData.stock_actual}
                 onChange={handleChange}
-                style={styles.input}
+                style={{
+                  ...styles.input,
+                  ...(debeDeshabilitarStock && !isEdit ? { backgroundColor: '#f3f4f6', cursor: 'not-allowed' } : {})
+                }}
                 min="0"
                 step="0.01"
                 placeholder="0"
+                disabled={debeDeshabilitarStock && !isEdit}
               />
             </div>
 
@@ -497,34 +614,73 @@ const ProductoForm = () => {
 
         {/* Precios */}
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>Listas de Precios</h2>
-          <p style={styles.sectionDescription}>
-            Define los precios para cada lista y moneda
-          </p>
+          <div style={styles.preciosHeader}>
+            <div>
+              <h2 style={styles.sectionTitle}>Listas de Precios</h2>
+              <p style={styles.sectionDescription}>
+                Define los precios para cada lista y moneda
+              </p>
+            </div>
+            {cotizacion && (
+              <div style={styles.cotizacionBadge}>
+                <Calculator size={16} />
+                <span>Cotización: ${cotizacion.toLocaleString('es-AR')} ARS = 1 USD</span>
+              </div>
+            )}
+          </div>
 
           <div style={styles.preciosGrid}>
-            {precios.map((precio, index) => (
-              <div key={index} style={styles.precioCard}>
-                <div style={styles.precioHeader}>
-                  <span style={styles.precioLabel}>
-                    {getListaNombre(precio.lista_precio_id)}
-                  </span>
-                  <span style={styles.precioMoneda}>
-                    {getMonedaNombre(precio.moneda_id)}
-                  </span>
+            {precios.map((precio, index) => {
+              const key = `${precio.lista_precio_id}-${precio.moneda_id}`;
+              const tieneSugerencia = preciosSugeridos[key];
+
+              return (
+                <div key={index} style={styles.precioCard}>
+                  <div style={styles.precioHeader}>
+                    <span style={styles.precioLabel}>
+                      {getListaNombre(precio.lista_precio_id)}
+                    </span>
+                    <span style={styles.precioMoneda}>
+                      {getMonedaNombre(precio.moneda_id)}
+                    </span>
+                  </div>
+                  
+                  <div style={styles.precioInputContainer}>
+                    <input
+                      type="number"
+                      value={precio.precio}
+                      onChange={(e) => handlePrecioChange(index, e.target.value)}
+                      style={styles.precioInput}
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                    />
+                    
+                    {tieneSugerencia && (
+                      <button
+                        type="button"
+                        onClick={() => aplicarPrecioSugerido(precio.lista_precio_id, precio.moneda_id)}
+                        style={styles.sugerenciaButton}
+                        title={`Aplicar precio sugerido: ${tieneSugerencia}`}
+                      >
+                        <Calculator size={14} />
+                        <span>{tieneSugerencia}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <input
-                  type="number"
-                  value={precio.precio}
-                  onChange={(e) => handlePrecioChange(index, e.target.value)}
-                  style={styles.precioInput}
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
+
+          {!cotizacion && !loadingCotizacion && (
+            <div style={styles.warningBox}>
+              <span>⚠️</span>
+              <span>
+                No hay cotización configurada. Ve a <strong>Configuración</strong> para establecer la cotización USD/ARS y habilitar sugerencias automáticas.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Imagen y Observaciones */}
@@ -982,6 +1138,61 @@ const styles = {
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
+  },
+  preciosHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '20px',
+    flexWrap: 'wrap',
+    gap: '16px',
+  },
+  cotizacionBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    backgroundColor: '#eff6ff',
+    color: '#2563eb',
+    borderRadius: '8px',
+    fontSize: '13px',
+    fontWeight: '600',
+    border: '2px solid #bfdbfe',
+  },
+  precioInputContainer: {
+    position: 'relative',
+  },
+  sugerenciaButton: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: '8px',
+    padding: '8px 12px',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#059669',
+    backgroundColor: '#d1fae5',
+    border: '2px solid #10b981',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+  },
+  warningBox: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+    padding: '16px',
+    backgroundColor: '#eff6ff',
+    border: '2px solid #3b82f6',
+    borderRadius: '8px',
+    fontSize: '14px',
+    color: '#1e40af',
+    marginBottom: '20px',
   },
 };
 

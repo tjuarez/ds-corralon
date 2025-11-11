@@ -188,6 +188,8 @@ export const createProducto = async (req, res) => {
       precios
     } = req.body;
 
+    const user = req.user; // Usuario autenticado
+
     // Validaciones
     if (!codigo || !descripcion || !unidad_medida) {
       return res.status(400).json({ 
@@ -207,29 +209,54 @@ export const createProducto = async (req, res) => {
       });
     }
 
-    // Insertar producto (stock_actual será 0, se maneja por sucursal)
+    // Validar stock inicial cuando no hay sucursal seleccionada
+    const stockInicial = parseFloat(stock_actual) || 0;
+    
+    if (!user.sucursal_id && stockInicial > 0) {
+      return res.status(400).json({ 
+        error: 'No se puede asignar stock inicial sin una sucursal seleccionada. Selecciona una sucursal específica o crea el producto sin stock y realiza un ajuste posterior.' 
+      });
+    }
+
+    // Insertar producto
     const result = await runQuery(
       `INSERT INTO productos (
         codigo, descripcion, categoria_id, marca, unidad_medida, 
         stock_minimo, stock_actual, ubicacion, proveedor_id, 
         imagen_url, observaciones, activo
-      ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, 1)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         codigo, descripcion, categoria_id || null, marca, unidad_medida,
-        stock_minimo || 0, ubicacion, proveedor_id || null,
+        stock_minimo || 0, stockInicial, ubicacion, proveedor_id || null,
         imagen_url, observaciones
       ]
     );
 
     const productoId = result.id;
 
-    // Inicializar stock en todas las sucursales activas
+    // Obtener todas las sucursales activas
     const sucursales = await getAll('SELECT id FROM sucursales WHERE activa = 1');
+    
+    // Inicializar stock en todas las sucursales
     for (const sucursal of sucursales) {
+      // Si es la sucursal del usuario, asignar el stock inicial
+      // Si es otra sucursal, inicializar en 0
+      const stockSucursal = (sucursal.id === user.sucursal_id) ? stockInicial : 0;
+      
       await runQuery(`
         INSERT INTO stock_sucursales (producto_id, sucursal_id, stock_actual, stock_minimo)
-        VALUES (?, ?, 0, ?)
-      `, [productoId, sucursal.id, stock_minimo || 0]);
+        VALUES (?, ?, ?, ?)
+      `, [productoId, sucursal.id, stockSucursal, stock_minimo || 0]);
+    }
+
+    // Si hubo stock inicial, registrar el movimiento
+    if (stockInicial > 0 && user.sucursal_id) {
+      await runQuery(`
+        INSERT INTO movimientos_stock (
+          producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
+          motivo, sucursal_id, usuario_id, fecha
+        ) VALUES (?, 'entrada', ?, 0, ?, 'Stock inicial', ?, ?, CURRENT_TIMESTAMP)
+      `, [productoId, stockInicial, stockInicial, user.sucursal_id, user.id]);
     }
 
     // Insertar precios si se proporcionan
