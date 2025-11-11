@@ -19,7 +19,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Store,
-  Truck
+  Truck,
+  TrendingUp
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -65,6 +66,7 @@ const Layout = ({ children }) => {
     { path: '/dashboard', icon: BarChart3, label: t('dashboard') },
     { path: '/clientes', icon: Users, label: t('clients') },
     { path: '/productos', icon: Package, label: t('products') },
+    { path: '/movimientos-stock', icon: TrendingUp, label: t('stockMovements') },
     { path: '/proveedores', icon: Truck, label: t('providers') },
     { path: '/ventas', icon: ShoppingCart, label: t('sales') },
     { path: '/presupuestos', icon: FileText, label: t('quotes') },

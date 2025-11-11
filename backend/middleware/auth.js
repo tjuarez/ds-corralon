@@ -19,18 +19,28 @@ export const authMiddleware = async (req, res, next) => {
       });
     }
 
-    // Obtener información completa del usuario desde la BD (incluyendo sucursal_id y nombre de sucursal)
+    // Obtener información completa del usuario desde la BD (incluyendo empresa_id)
     const user = await getOne(`
-      SELECT u.id, u.username, u.nombre, u.apellido, u.email, u.rol, u.sucursal_id, u.activo,
-             s.nombre as sucursal_nombre
+      SELECT u.id, u.username, u.nombre, u.apellido, u.email, u.rol, 
+             u.sucursal_id, u.activo, u.empresa_id,
+             s.nombre as sucursal_nombre,
+             e.slug as empresa_slug, e.nombre as empresa_nombre
       FROM usuarios u
       LEFT JOIN sucursales s ON u.sucursal_id = s.id
+      LEFT JOIN empresas e ON u.empresa_id = e.id
       WHERE u.id = ?
     `, [decoded.id]);
 
     if (!user || !user.activo) {
       return res.status(401).json({ 
         error: 'Usuario no válido o inactivo' 
+      });
+    }
+
+    // Verificar que el usuario tenga empresa asignada (excepto super_admin)
+    if (user.rol !== 'super_admin' && !user.empresa_id) {
+      return res.status(403).json({ 
+        error: 'Usuario sin empresa asignada. Contacte al administrador.' 
       });
     }
 
@@ -42,8 +52,8 @@ export const authMiddleware = async (req, res, next) => {
       if (sucursalActivaId && sucursalActivaId !== 'null' && sucursalActivaId !== 'undefined') {
         // Admin tiene una sucursal activa seleccionada
         const sucursalActiva = await getOne(
-          'SELECT id, nombre FROM sucursales WHERE id = ?',
-          [parseInt(sucursalActivaId)]
+          'SELECT id, nombre FROM sucursales WHERE id = ? AND empresa_id = ?',
+          [parseInt(sucursalActivaId), user.empresa_id]
         );
 
         if (sucursalActiva) {
@@ -93,8 +103,8 @@ export const checkSucursal = (req, res, next) => {
     return res.status(401).json({ error: 'No autorizado' });
   }
 
-  // Admin puede acceder a todas las sucursales (incluso sin sucursal activa)
-  if (user.rol === 'admin') {
+  // Admin y super_admin pueden acceder a todas las sucursales
+  if (user.rol === 'admin' || user.rol === 'super_admin') {
     return next();
   }
 

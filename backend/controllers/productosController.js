@@ -292,12 +292,15 @@ export const updateProducto = async (req, res) => {
       marca,
       unidad_medida,
       stock_minimo,
+      stock_actual,
       ubicacion,
       proveedor_id,
       imagen_url,
       observaciones,
       activo
     } = req.body;
+
+    const user = req.user;
 
     // Verificar que existe
     const producto = await getOne('SELECT id FROM productos WHERE id = ?', [id]);
@@ -319,7 +322,7 @@ export const updateProducto = async (req, res) => {
       }
     }
 
-    // NO actualizar stock_actual directamente, se maneja por sucursal
+    // Actualizar datos básicos del producto (sin stock_actual)
     await runQuery(
       `UPDATE productos SET
         codigo = ?, descripcion = ?, categoria_id = ?, marca = ?, 
@@ -333,6 +336,60 @@ export const updateProducto = async (req, res) => {
         imagen_url, observaciones, activo !== undefined ? activo : 1, id
       ]
     );
+
+    // Actualizar stock en stock_sucursales SI:
+    // 1. Se proporcionó stock_actual en el body
+    // 2. El usuario tiene una sucursal seleccionada
+    if (stock_actual !== undefined && user.sucursal_id) {
+      const nuevoStock = parseFloat(stock_actual) || 0;
+
+      // Obtener stock actual de esta sucursal
+      const stockSucursal = await getOne(
+        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
+        [id, user.sucursal_id]
+      );
+
+      if (stockSucursal) {
+        const stockAnterior = parseFloat(stockSucursal.stock_actual) || 0;
+        const diferencia = nuevoStock - stockAnterior;
+
+        // Solo actualizar si hay diferencia
+        if (diferencia !== 0) {
+          // Actualizar stock en stock_sucursales
+          await runQuery(
+            'UPDATE stock_sucursales SET stock_actual = ?, stock_minimo = ? WHERE producto_id = ? AND sucursal_id = ?',
+            [nuevoStock, stock_minimo || 0, id, user.sucursal_id]
+          );
+
+          // Registrar movimiento de stock
+          await runQuery(`
+            INSERT INTO movimientos_stock (
+              producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
+              motivo, sucursal_id, usuario_id, fecha
+            ) VALUES (?, 'ajuste', ?, ?, ?, 'Ajuste desde edición de producto', ?, ?, CURRENT_TIMESTAMP)
+          `, [id, Math.abs(diferencia), stockAnterior, nuevoStock, user.sucursal_id, user.id]);
+
+          // Recalcular stock_actual total del producto (suma de todas las sucursales)
+          const totalStock = await getOne(
+            'SELECT SUM(stock_actual) as total FROM stock_sucursales WHERE producto_id = ?',
+            [id]
+          );
+
+          await runQuery(
+            'UPDATE productos SET stock_actual = ? WHERE id = ?',
+            [totalStock.total || 0, id]
+          );
+        }
+      }
+    }
+
+    // Actualizar stock_minimo en todas las sucursales
+    if (stock_minimo !== undefined) {
+      await runQuery(
+        'UPDATE stock_sucursales SET stock_minimo = ? WHERE producto_id = ?',
+        [stock_minimo || 0, id]
+      );
+    }
 
     res.json({ message: 'Producto actualizado exitosamente' });
   } catch (error) {

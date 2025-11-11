@@ -41,6 +41,7 @@ import SucursalForm from '../pages/SucursalForm';
 import Usuarios from '../pages/Usuarios';
 import UsuarioForm from '../pages/UsuarioForm';
 import Configuracion from '../pages/Configuracion';
+import MovimientosStock from '../pages/MovimientosStock';
 
 const AppRoutes = () => {
   return (
@@ -205,6 +206,8 @@ const AppRoutes = () => {
       <Route path="/usuarios/:id/editar" element={<UsuarioForm />} />
 
       <Route path="/configuracion" element={<Configuracion />} />
+
+      <Route path="/movimientos-stock" element={<ProtectedRoute><MovimientosStock /></ProtectedRoute>} />
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

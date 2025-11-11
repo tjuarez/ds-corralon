@@ -276,52 +276,102 @@ export const getReporteClientes = async (req, res) => {
   }
 };
 
-// Reporte de stock
+// Reporte de stock por sucursal
 export const getReporteStock = async (req, res) => {
   try {
-    const { tipo } = req.query; // critico, sin_stock, todos
+    const { tipo, sucursal_id } = req.query;
+    const user = req.user;
 
+    // Determinar qué sucursal(es) consultar
+    let sucursalFiltro = null;
+    if (user.rol === 'admin') {
+      // Admin puede ver todas las sucursales o una específica
+      sucursalFiltro = sucursal_id || user.sucursal_id;
+    } else {
+      // Otros roles solo ven su sucursal
+      sucursalFiltro = user.sucursal_id;
+    }
+
+    // Query base con stock por sucursal
     let sql = `
       SELECT 
         p.id,
         p.codigo,
         p.descripcion,
         c.nombre as categoria,
-        p.stock_actual,
-        p.stock_minimo,
         p.unidad_medida,
+        ss.sucursal_id,
+        s.nombre as sucursal_nombre,
+        ss.stock_actual,
+        ss.stock_minimo,
         CASE 
-          WHEN p.stock_actual = 0 THEN 'sin_stock'
-          WHEN p.stock_actual <= p.stock_minimo THEN 'critico'
+          WHEN ss.stock_actual = 0 THEN 'sin_stock'
+          WHEN ss.stock_actual <= ss.stock_minimo THEN 'critico'
           ELSE 'normal'
         END as estado_stock
       FROM productos p
       LEFT JOIN categorias c ON p.categoria_id = c.id
-      WHERE p.activo = 1
+      INNER JOIN stock_sucursales ss ON p.id = ss.producto_id
+      INNER JOIN sucursales s ON ss.sucursal_id = s.id
+      WHERE p.activo = 1 AND s.activa = 1
     `;
 
-    if (tipo === 'critico') {
-      sql += ` AND p.stock_actual <= p.stock_minimo AND p.stock_actual > 0`;
-    } else if (tipo === 'sin_stock') {
-      sql += ` AND p.stock_actual = 0`;
+    const params = [];
+
+    // Filtrar por sucursal si es necesario
+    if (sucursalFiltro) {
+      sql += ` AND ss.sucursal_id = ?`;
+      params.push(sucursalFiltro);
     }
 
-    sql += ` ORDER BY p.stock_actual ASC, p.descripcion ASC`;
+    // Filtrar por tipo de stock
+    if (tipo === 'critico') {
+      sql += ` AND ss.stock_actual <= ss.stock_minimo AND ss.stock_actual > 0`;
+    } else if (tipo === 'sin_stock') {
+      sql += ` AND ss.stock_actual = 0`;
+    } else if (tipo === 'normal') {
+      sql += ` AND ss.stock_actual > ss.stock_minimo`;
+    }
 
-    const productos = await getAll(sql);
+    sql += ` ORDER BY p.codigo ASC, s.nombre ASC`;
 
-    // Resumen
-    const resumen = await getOne(`
+    const productos = await getAll(sql, params);
+
+    // Resumen general
+    let resumenSql = `
       SELECT 
-        COUNT(*) as total_productos,
-        SUM(CASE WHEN stock_actual = 0 THEN 1 ELSE 0 END) as sin_stock,
-        SUM(CASE WHEN stock_actual <= stock_minimo AND stock_actual > 0 THEN 1 ELSE 0 END) as stock_critico,
-        SUM(CASE WHEN stock_actual > stock_minimo THEN 1 ELSE 0 END) as stock_normal
-      FROM productos
-      WHERE activo = 1
+        COUNT(DISTINCT p.id) as total_productos,
+        SUM(CASE WHEN ss.stock_actual = 0 THEN 1 ELSE 0 END) as sin_stock,
+        SUM(CASE WHEN ss.stock_actual <= ss.stock_minimo AND ss.stock_actual > 0 THEN 1 ELSE 0 END) as stock_critico,
+        SUM(CASE WHEN ss.stock_actual > ss.stock_minimo THEN 1 ELSE 0 END) as stock_normal
+      FROM productos p
+      INNER JOIN stock_sucursales ss ON p.id = ss.producto_id
+      INNER JOIN sucursales s ON ss.sucursal_id = s.id
+      WHERE p.activo = 1 AND s.activa = 1
+    `;
+
+    const resumenParams = [];
+    if (sucursalFiltro) {
+      resumenSql += ` AND ss.sucursal_id = ?`;
+      resumenParams.push(sucursalFiltro);
+    }
+
+    const resumen = await getOne(resumenSql, resumenParams);
+
+    // Lista de sucursales activas (para el selector)
+    const sucursales = await getAll(`
+      SELECT id, nombre
+      FROM sucursales
+      WHERE activa = 1
+      ORDER BY nombre ASC
     `);
 
-    res.json({ productos, resumen });
+    res.json({ 
+      productos, 
+      resumen,
+      sucursales,
+      sucursal_actual: sucursalFiltro ? { id: sucursalFiltro } : null
+    });
   } catch (error) {
     console.error('Error en getReporteStock:', error);
     res.status(500).json({ error: 'Error al obtener reporte de stock' });
