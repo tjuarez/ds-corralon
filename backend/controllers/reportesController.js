@@ -1,10 +1,12 @@
 import { getAll, getOne } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Dashboard principal - Métricas generales
 export const getDashboard = async (req, res) => {
   try {
     const hoy = new Date().toISOString().split('T')[0];
     const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const empresaId = getEmpresaId(req);
 
     // Ventas del día
     const ventasHoy = await getOne(`
@@ -12,8 +14,10 @@ export const getDashboard = async (req, res) => {
         COUNT(*) as cantidad,
         COALESCE(SUM(total), 0) as total
       FROM ventas
-      WHERE DATE(fecha) = ? AND estado != 'anulada'
-    `, [hoy]);
+      WHERE empresa_id = ?
+      AND DATE(fecha) = ? 
+      AND estado != 'anulada'
+    `, [empresaId, hoy]);
 
     // Ventas del mes
     const ventasMes = await getOne(`
@@ -21,15 +25,19 @@ export const getDashboard = async (req, res) => {
         COUNT(*) as cantidad,
         COALESCE(SUM(total), 0) as total
       FROM ventas
-      WHERE DATE(fecha) >= ? AND estado != 'anulada'
-    `, [inicioMes]);
+      WHERE empresa_id = ?
+      AND DATE(fecha) >= ? 
+      AND estado != 'anulada'
+    `, [empresaId, inicioMes]);
 
     // Stock crítico (productos bajo stock mínimo)
     const stockCritico = await getOne(`
       SELECT COUNT(*) as cantidad
       FROM productos
-      WHERE stock_actual <= stock_minimo AND activo = 1
-    `);
+      WHERE empresa_id = ?
+      AND stock_actual <= stock_minimo 
+      AND activo = 1
+    `, [empresaId]);
 
     // Cuenta corriente - Deuda total
     const cuentaCorriente = await getOne(`
@@ -37,8 +45,10 @@ export const getDashboard = async (req, res) => {
         COUNT(*) as clientes_con_deuda,
         COALESCE(SUM(saldo_cuenta_corriente), 0) as deuda_total
       FROM clientes
-      WHERE saldo_cuenta_corriente > 0 AND activo = 1
-    `);
+      WHERE empresa_id = ?
+      AND saldo_cuenta_corriente > 0 
+      AND activo = 1
+    `, [empresaId]);
 
     // Caja abierta
     const cajaAbierta = await getOne(`
@@ -46,8 +56,9 @@ export const getDashboard = async (req, res) => {
         COUNT(*) as cantidad,
         COALESCE(SUM(monto_inicial + total_ingresos - total_egresos), 0) as monto_total
       FROM cajas
-      WHERE estado = 'abierta'
-    `);
+      WHERE empresa_id = ?
+      AND estado = 'abierta'
+    `, [empresaId]);
 
     // Presupuestos pendientes
     const presupuestosPendientes = await getOne(`
@@ -55,8 +66,9 @@ export const getDashboard = async (req, res) => {
         COUNT(*) as cantidad,
         COALESCE(SUM(total), 0) as total
       FROM presupuestos
-      WHERE estado = 'pendiente'
-    `);
+      WHERE empresa_id = ?
+      AND estado = 'pendiente'
+    `, [empresaId]);
 
     // Top 5 productos más vendidos del mes
     const topProductos = await getAll(`
@@ -67,13 +79,15 @@ export const getDashboard = async (req, res) => {
         SUM(vd.cantidad) as cantidad_vendida,
         SUM(vd.subtotal) as total_vendido
       FROM ventas_detalle vd
-      JOIN ventas v ON vd.venta_id = v.id
-      JOIN productos p ON vd.producto_id = p.id
-      WHERE DATE(v.fecha) >= ? AND v.estado != 'anulada'
+      JOIN ventas v ON vd.empresa_id = v.empresa_id AND vd.venta_id = v.id
+      JOIN productos p ON vd.empresa_id = p.empresa_id AND vd.producto_id = p.id
+      WHERE vd.empresa_id = ?
+      AND DATE(v.fecha) >= ? 
+      AND v.estado != 'anulada'
       GROUP BY p.id, p.codigo, p.descripcion
       ORDER BY cantidad_vendida DESC
       LIMIT 5
-    `, [inicioMes]);
+    `, [empresaId, inicioMes]);
 
     // Top 5 clientes del mes
     const topClientes = await getAll(`
@@ -83,12 +97,14 @@ export const getDashboard = async (req, res) => {
         COUNT(v.id) as cantidad_compras,
         SUM(v.total) as total_comprado
       FROM ventas v
-      JOIN clientes c ON v.cliente_id = c.id
-      WHERE DATE(v.fecha) >= ? AND v.estado != 'anulada'
+      JOIN clientes c ON v.empresa_id = c.empresa_id AND v.cliente_id = c.id
+      WHERE v.empresa_id = ?
+      AND DATE(v.fecha) >= ? 
+      AND v.estado != 'anulada'
       GROUP BY c.id, c.razon_social
       ORDER BY total_comprado DESC
       LIMIT 5
-    `, [inicioMes]);
+    `, [empresaId, inicioMes]);
 
     // Ventas por día (últimos 7 días)
     const ventasUltimos7Dias = await getAll(`
@@ -97,10 +113,12 @@ export const getDashboard = async (req, res) => {
         COUNT(*) as cantidad,
         SUM(total) as total
       FROM ventas
-      WHERE DATE(fecha) >= DATE('now', '-7 days') AND estado != 'anulada'
+      WHERE empresa_id = ?
+      AND DATE(fecha) >= DATE('now', '-7 days') 
+      AND estado != 'anulada'
       GROUP BY DATE(fecha)
       ORDER BY fecha ASC
-    `);
+    `, [empresaId]);
 
     res.json({
       ventasHoy,
@@ -123,6 +141,7 @@ export const getDashboard = async (req, res) => {
 export const getReporteVentas = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, agrupar_por } = req.query;
+    const empresaId = getEmpresaId(req);
 
     if (!fecha_desde || !fecha_hasta) {
       return res.status(400).json({ error: 'Fecha desde y hasta son requeridas' });
@@ -150,10 +169,12 @@ export const getReporteVentas = async (req, res) => {
         SUM(descuento_monto) as descuentos,
         SUM(total) as total
       FROM ventas
-      WHERE DATE(fecha) BETWEEN ? AND ? AND estado != 'anulada'
+      WHERE empresa_id = ?
+      AND DATE(fecha) BETWEEN ? AND ? 
+      AND estado != 'anulada'
       GROUP BY periodo
       ORDER BY periodo ASC
-    `, [fecha_desde, fecha_hasta]);
+    `, [empresaId, fecha_desde, fecha_hasta]);
 
     // Resumen general
     const resumen = await getOne(`
@@ -164,8 +185,10 @@ export const getReporteVentas = async (req, res) => {
         COALESCE(SUM(total), 0) as total_general,
         COALESCE(AVG(total), 0) as ticket_promedio
       FROM ventas
-      WHERE DATE(fecha) BETWEEN ? AND ? AND estado != 'anulada'
-    `, [fecha_desde, fecha_hasta]);
+      WHERE empresa_id = ?
+      AND DATE(fecha) BETWEEN ? AND ? 
+      AND estado != 'anulada'
+    `, [empresaId, fecha_desde, fecha_hasta]);
 
     // Asegurar que los valores sean números válidos
     const resumenFinal = {
@@ -183,10 +206,12 @@ export const getReporteVentas = async (req, res) => {
         COUNT(*) as cantidad,
         SUM(total) as total
       FROM ventas
-      WHERE DATE(fecha) BETWEEN ? AND ? AND estado != 'anulada'
+      WHERE empresa_id = ?
+      AND DATE(fecha) BETWEEN ? AND ? 
+      AND estado != 'anulada'
       GROUP BY forma_pago
       ORDER BY total DESC
-    `, [fecha_desde, fecha_hasta]);
+    `, [empresaId, fecha_desde, fecha_hasta]);
 
     res.json({
       ventas,
@@ -203,6 +228,7 @@ export const getReporteVentas = async (req, res) => {
 export const getReporteProductos = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, limite } = req.query;
+    const empresaId = getEmpresaId(req);
 
     if (!fecha_desde || !fecha_hasta) {
       return res.status(400).json({ error: 'Fecha desde y hasta son requeridas' });
@@ -222,14 +248,15 @@ export const getReporteProductos = async (req, res) => {
         SUM(vd.subtotal) as total_vendido,
         COUNT(DISTINCT v.id) as numero_ventas
       FROM ventas_detalle vd
-      JOIN ventas v ON vd.venta_id = v.id
-      JOIN productos p ON vd.producto_id = p.id
-      LEFT JOIN categorias c ON p.categoria_id = c.id
-      WHERE DATE(v.fecha) BETWEEN ? AND ? AND v.estado != 'anulada'
+      JOIN ventas v ON vd.empresa_id = v.empresa_id AND vd.venta_id = v.id
+      JOIN productos p ON vd.empresa_id = p.empresa_id AND vd.producto_id = p.id
+      LEFT JOIN categorias c ON vd.empresa_id = c.empresa_id AND p.categoria_id = c.id
+      WHERE vd.empresa_id = ?
+      AND DATE(v.fecha) BETWEEN ? AND ? AND v.estado != 'anulada'
       GROUP BY p.id, p.codigo, p.descripcion, p.stock_actual, p.stock_minimo, c.nombre
       ORDER BY cantidad_vendida DESC
       LIMIT ?
-    `, [fecha_desde, fecha_hasta, limit]);
+    `, [empresaId, fecha_desde, fecha_hasta, limit]);
 
     res.json({ productos });
   } catch (error) {
@@ -242,6 +269,7 @@ export const getReporteProductos = async (req, res) => {
 export const getReporteClientes = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, limite } = req.query;
+    const empresaId = getEmpresaId(req);
 
     if (!fecha_desde || !fecha_hasta) {
       return res.status(400).json({ error: 'Fecha desde y hasta son requeridas' });
@@ -260,14 +288,15 @@ export const getReporteClientes = async (req, res) => {
         SUM(v.total) as total_comprado,
         MAX(v.fecha) as ultima_compra
       FROM clientes c
-      LEFT JOIN ventas v ON c.id = v.cliente_id 
+      LEFT JOIN ventas v ON c.empresa_id = v.empresa_id AND c.id = v.cliente_id 
         AND DATE(v.fecha) BETWEEN ? AND ? 
         AND v.estado != 'anulada'
-      WHERE c.activo = 1
+      WHERE c.empresa_id = ?
+      AND c.activo = 1
       GROUP BY c.id, c.razon_social, c.tipo_cliente, c.saldo_cuenta_corriente, c.limite_credito
       ORDER BY total_comprado DESC
       LIMIT ?
-    `, [fecha_desde, fecha_hasta, limit]);
+    `, [fecha_desde, fecha_hasta, empresaId, limit]);
 
     res.json({ clientes });
   } catch (error) {
@@ -281,6 +310,7 @@ export const getReporteStock = async (req, res) => {
   try {
     const { tipo, sucursal_id } = req.query;
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     // Determinar qué sucursal(es) consultar
     let sucursalFiltro = null;
@@ -310,13 +340,15 @@ export const getReporteStock = async (req, res) => {
           ELSE 'normal'
         END as estado_stock
       FROM productos p
-      LEFT JOIN categorias c ON p.categoria_id = c.id
-      INNER JOIN stock_sucursales ss ON p.id = ss.producto_id
-      INNER JOIN sucursales s ON ss.sucursal_id = s.id
-      WHERE p.activo = 1 AND s.activa = 1
+      LEFT JOIN categorias c ON p.empresa_id = c.empresa_id AND p.categoria_id = c.id
+      INNER JOIN stock_sucursales ss ON p.empresa_id = ss.empresa_id AND p.id = ss.producto_id
+      INNER JOIN sucursales s ON p.empresa_id = s.empresa_id AND ss.sucursal_id = s.id
+      WHERE p.empresa_id = ?
+      AND p.activo = 1 
+      AND s.activa = 1
     `;
 
-    const params = [];
+    const params = [empresaId];
 
     // Filtrar por sucursal si es necesario
     if (sucursalFiltro) {
@@ -345,12 +377,14 @@ export const getReporteStock = async (req, res) => {
         SUM(CASE WHEN ss.stock_actual <= ss.stock_minimo AND ss.stock_actual > 0 THEN 1 ELSE 0 END) as stock_critico,
         SUM(CASE WHEN ss.stock_actual > ss.stock_minimo THEN 1 ELSE 0 END) as stock_normal
       FROM productos p
-      INNER JOIN stock_sucursales ss ON p.id = ss.producto_id
-      INNER JOIN sucursales s ON ss.sucursal_id = s.id
-      WHERE p.activo = 1 AND s.activa = 1
+      INNER JOIN stock_sucursales ss ON p.empresa_id = ss.empresa_id AND p.id = ss.producto_id
+      INNER JOIN sucursales s ON p.empresa_id = s.empresa_id AND ss.sucursal_id = s.id
+      WHERE p.empresa_id = ?
+      AND p.activo = 1 
+      AND s.activa = 1
     `;
 
-    const resumenParams = [];
+    const resumenParams = [empresaId];
     if (sucursalFiltro) {
       resumenSql += ` AND ss.sucursal_id = ?`;
       resumenParams.push(sucursalFiltro);
@@ -362,9 +396,10 @@ export const getReporteStock = async (req, res) => {
     const sucursales = await getAll(`
       SELECT id, nombre
       FROM sucursales
-      WHERE activa = 1
+      WHERE empresa_id = ?
+      AND activa = 1
       ORDER BY nombre ASC
-    `);
+    `, [empresaId]);
 
     res.json({ 
       productos, 
@@ -382,6 +417,7 @@ export const getReporteStock = async (req, res) => {
 export const getReporteCaja = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta } = req.query;
+    const empresaId = getEmpresaId(req);
 
     if (!fecha_desde || !fecha_hasta) {
       return res.status(400).json({ error: 'Fecha desde y hasta son requeridas' });
@@ -393,11 +429,12 @@ export const getReporteCaja = async (req, res) => {
         ua.nombre || ' ' || ua.apellido as usuario_apertura,
         uc.nombre || ' ' || uc.apellido as usuario_cierre
       FROM cajas c
-      LEFT JOIN usuarios ua ON c.usuario_apertura_id = ua.id
-      LEFT JOIN usuarios uc ON c.usuario_cierre_id = uc.id
-      WHERE DATE(c.fecha_apertura) BETWEEN ? AND ?
+      LEFT JOIN usuarios ua ON c.empresa_id = ua.empresa_id AND c.usuario_apertura_id = ua.id
+      LEFT JOIN usuarios uc ON c.empresa_id = uc.empresa_id AND c.usuario_cierre_id = uc.id
+      WHERE c.empresa_id = ?
+      AND DATE(c.fecha_apertura) BETWEEN ? AND ?
       ORDER BY c.fecha_apertura DESC
-    `, [fecha_desde, fecha_hasta]);
+    `, [empresaId, fecha_desde, fecha_hasta]);
 
     // Resumen
     const resumen = await getOne(`
@@ -409,8 +446,9 @@ export const getReporteCaja = async (req, res) => {
         SUM(total_egresos) as total_egresos,
         SUM(CASE WHEN estado = 'cerrada' THEN diferencia ELSE 0 END) as diferencias_total
       FROM cajas
-      WHERE DATE(fecha_apertura) BETWEEN ? AND ?
-    `, [fecha_desde, fecha_hasta]);
+      WHERE empresa_id = ?
+      AND DATE(fecha_apertura) BETWEEN ? AND ?
+    `, [empresaId, fecha_desde, fecha_hasta]);
 
     res.json({ cajas, resumen });
   } catch (error) {
@@ -423,6 +461,7 @@ export const getReporteCaja = async (req, res) => {
 export const getReporteRentabilidad = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta } = req.query;
+    const empresaId = getEmpresaId(req);
 
     if (!fecha_desde || !fecha_hasta) {
       return res.status(400).json({ error: 'Fecha desde y hasta son requeridas' });
@@ -434,8 +473,10 @@ export const getReporteRentabilidad = async (req, res) => {
         COUNT(*) as cantidad,
         COALESCE(SUM(total), 0) as total
       FROM ventas
-      WHERE DATE(fecha) BETWEEN ? AND ? AND estado != 'anulada'
-    `, [fecha_desde, fecha_hasta]);
+      WHERE empresa_id = ?
+      AND DATE(fecha) BETWEEN ? AND ? 
+      AND estado != 'anulada'
+    `, [empresaId, fecha_desde, fecha_hasta]);
 
     // Total de compras
     const compras = await getOne(`
@@ -443,8 +484,10 @@ export const getReporteRentabilidad = async (req, res) => {
         COUNT(*) as cantidad,
         COALESCE(SUM(total), 0) as total
       FROM compras
-      WHERE DATE(fecha) BETWEEN ? AND ? AND estado != 'anulada'
-    `, [fecha_desde, fecha_hasta]);
+      WHERE empresa_id = ?
+      AND DATE(fecha) BETWEEN ? AND ? 
+      AND estado != 'anulada'
+    `, [empresaId, fecha_desde, fecha_hasta]);
 
     // Calcular rentabilidad aproximada
     const rentabilidad = parseFloat(ventas.total) - parseFloat(compras.total);

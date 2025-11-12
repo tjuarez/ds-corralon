@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { clientesApi } from '../api/clientes';
 import Layout from '../components/Layout';
@@ -100,7 +101,7 @@ const ClienteForm = () => {
       }
     } catch (error) {
       showError(error.message);
-      navigate('/clientes');
+      navigate(buildTenantPath('/clientes'));
     } finally {
       setLoadingData(false);
     }
@@ -139,7 +140,7 @@ const ClienteForm = () => {
         showSuccess('Cliente creado exitosamente');
       }
       
-      navigate('/clientes');
+      navigate(buildTenantPath('/clientes'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -170,7 +171,7 @@ const ClienteForm = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/clientes')}
+          onClick={() => navigate(buildTenantPath('/clientes'))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -439,7 +440,7 @@ const ClienteForm = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate('/clientes')}
+            onClick={() => navigate(buildTenantPath('/clientes'))}
             style={styles.cancelButton}
             disabled={loading}
           >

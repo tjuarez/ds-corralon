@@ -1,10 +1,12 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todas las cajas
 export const getCajas = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, estado, usuario_id, sucursal_id } = req.query;
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT c.*,
@@ -12,12 +14,12 @@ export const getCajas = async (req, res) => {
              uc.nombre || ' ' || uc.apellido as usuario_cierre_nombre,
              s.nombre as sucursal_nombre
       FROM cajas c
-      LEFT JOIN usuarios ua ON c.usuario_apertura_id = ua.id
-      LEFT JOIN usuarios uc ON c.usuario_cierre_id = uc.id
-      LEFT JOIN sucursales s ON c.sucursal_id = s.id
-      WHERE 1=1
+      LEFT JOIN usuarios ua ON c.empresa_id = ua.empresa_id AND c.usuario_apertura_id = ua.id
+      LEFT JOIN usuarios uc ON c.empresa_id = uc.empresa_id AND c.usuario_cierre_id = uc.id
+      LEFT JOIN sucursales s ON c.empresa_id = s.empresa_id AND c.sucursal_id = s.id
+      WHERE c.empresa_id = ?
     `;
-    const params = [];
+    const params = [empresaId];
 
     // FILTRO CRÍTICO: Control por sucursal
     if (user.rol !== 'admin' || user.sucursal_id) {
@@ -68,6 +70,7 @@ export const getCajas = async (req, res) => {
 export const getCajaById = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const caja = await getOne(`
       SELECT c.*,
@@ -75,11 +78,12 @@ export const getCajaById = async (req, res) => {
              uc.nombre || ' ' || uc.apellido as usuario_cierre_nombre,
              s.nombre as sucursal_nombre
       FROM cajas c
-      LEFT JOIN usuarios ua ON c.usuario_apertura_id = ua.id
-      LEFT JOIN usuarios uc ON c.usuario_cierre_id = uc.id
-      LEFT JOIN sucursales s ON c.sucursal_id = s.id
-      WHERE c.id = ?
-    `, [id]);
+      LEFT JOIN usuarios ua ON c.empresa_id = ua.empresa_id AND c.usuario_apertura_id = ua.id
+      LEFT JOIN usuarios uc ON c.empresa_id = uc.empresa_id AND c.usuario_cierre_id = uc.id
+      LEFT JOIN sucursales s ON c.empresa_id = s.empresa_id AND c.sucursal_id = s.id
+      WHERE c.empresa_id = ?
+      AND c.id = ?
+    `, [empresaId, id]);
 
     if (!caja) {
       return res.status(404).json({ error: 'Caja no encontrada' });
@@ -90,10 +94,11 @@ export const getCajaById = async (req, res) => {
       SELECT m.*,
              u.nombre || ' ' || u.apellido as usuario_nombre
       FROM movimientos_caja m
-      LEFT JOIN usuarios u ON m.usuario_id = u.id
-      WHERE m.caja_id = ?
+      LEFT JOIN usuarios u ON m.empresa_id = u.empresa_id AND m.usuario_id = u.id
+      WHERE m.empresa_id = ?
+      AND m.caja_id = ?
       ORDER BY m.fecha DESC
-    `, [id]);
+    `, [empresaId, id]);
 
     res.json({ 
       caja: { 
@@ -112,17 +117,19 @@ export const getCajaAbierta = async (req, res) => {
   try {
     const { usuario_id } = req.query;
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT c.*,
              ua.nombre || ' ' || ua.apellido as usuario_apertura_nombre,
              s.nombre as sucursal_nombre
       FROM cajas c
-      LEFT JOIN usuarios ua ON c.usuario_apertura_id = ua.id
-      LEFT JOIN sucursales s ON c.sucursal_id = s.id
-      WHERE c.estado = 'abierta'
+      LEFT JOIN usuarios ua ON c.empresa_id = ua.empresa_id AND c.usuario_apertura_id = ua.id
+      LEFT JOIN sucursales s ON c.empresa_id = s.empresa_id AND c.sucursal_id = s.id
+      WHERE c.empresa_id = ?
+      AND c.estado = 'abierta'
     `;
-    const params = [];
+    const params = [empresaId];
 
     // FILTRO: Solo puede ver caja abierta de su sucursal
     if (user.sucursal_id) {
@@ -145,10 +152,11 @@ export const getCajaAbierta = async (req, res) => {
         SELECT m.*,
                u.nombre || ' ' || u.apellido as usuario_nombre
         FROM movimientos_caja m
-        LEFT JOIN usuarios u ON m.usuario_id = u.id
-        WHERE m.caja_id = ?
+        LEFT JOIN usuarios u ON m.empresa_id = u.empresa_id AND m.usuario_id = u.id
+        WHERE m.empresa_id = ?
+        AND m.caja_id = ?
         ORDER BY m.fecha DESC
-      `, [caja.id]);
+      `, [empresaId, caja.id]);
 
       res.json({ caja: { ...caja, movimientos } });
     } else {
@@ -165,6 +173,7 @@ export const abrirCaja = async (req, res) => {
   try {
     const { monto_inicial, observaciones, usuario_id } = req.body;
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     // VALIDACIÓN CRÍTICA: Usuario debe tener sucursal
     if (!user.sucursal_id) {
@@ -179,8 +188,8 @@ export const abrirCaja = async (req, res) => {
 
     // Verificar que no haya otra caja abierta del mismo usuario en la misma sucursal
     const cajaAbierta = await getOne(
-      'SELECT id FROM cajas WHERE usuario_apertura_id = ? AND sucursal_id = ? AND estado = ?',
-      [usuario_id, user.sucursal_id, 'abierta']
+      'SELECT id FROM cajas WHERE empresa_id = ? AND usuario_apertura_id = ? AND sucursal_id = ? AND estado = ?',
+      [empresaId, usuario_id, user.sucursal_id, 'abierta']
     );
 
     if (cajaAbierta) {
@@ -191,7 +200,7 @@ export const abrirCaja = async (req, res) => {
 
     // Obtener el último número de caja
     const ultimaCaja = await getOne(
-      'SELECT numero FROM cajas ORDER BY numero DESC LIMIT 1'
+      'SELECT numero FROM cajas WHERE empresa_id = ? ORDER BY numero DESC LIMIT 1', [empresaId]
     );
     const numeroNuevo = ultimaCaja ? ultimaCaja.numero + 1 : 1;
 
@@ -199,9 +208,9 @@ export const abrirCaja = async (req, res) => {
     const result = await runQuery(`
       INSERT INTO cajas (
         numero, fecha_apertura, usuario_apertura_id, sucursal_id, monto_inicial,
-        estado, observaciones_apertura
-      ) VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'abierta', ?)
-    `, [numeroNuevo, usuario_id, user.sucursal_id, monto_inicial, observaciones]);
+        estado, observaciones_apertura, empresa_id
+      ) VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, 'abierta', ?, ?)
+    `, [numeroNuevo, usuario_id, user.sucursal_id, monto_inicial, observaciones, empresaId]);
 
     res.status(201).json({
       message: 'Caja abierta exitosamente',
@@ -219,12 +228,13 @@ export const cerrarCaja = async (req, res) => {
   try {
     const { id } = req.params;
     const { monto_final, observaciones, usuario_id } = req.body;
+    const empresaId = getEmpresaId(req);
 
     if (monto_final === undefined || monto_final < 0) {
       return res.status(400).json({ error: 'Monto final inválido' });
     }
 
-    const caja = await getOne('SELECT * FROM cajas WHERE id = ?', [id]);
+    const caja = await getOne('SELECT * FROM cajas WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     if (!caja) {
       return res.status(404).json({ error: 'Caja no encontrada' });
@@ -240,8 +250,9 @@ export const cerrarCaja = async (req, res) => {
         COALESCE(SUM(CASE WHEN tipo_movimiento = 'ingreso' THEN monto ELSE 0 END), 0) as total_ingresos,
         COALESCE(SUM(CASE WHEN tipo_movimiento = 'egreso' THEN monto ELSE 0 END), 0) as total_egresos
       FROM movimientos_caja
-      WHERE caja_id = ?
-    `, [id]);
+      WHERE empresa_id = ?
+      AND caja_id = ?
+    `, [empresaId, id]);
 
     const montoEsperado = parseFloat(caja.monto_inicial) + 
                           parseFloat(totales.total_ingresos) - 
@@ -260,10 +271,11 @@ export const cerrarCaja = async (req, res) => {
         diferencia = ?,
         estado = 'cerrada',
         observaciones_cierre = ?
-      WHERE id = ?
+      WHERE empresa_id = ?
+      AND id = ?
     `, [
       usuario_id, monto_final, totales.total_ingresos, totales.total_egresos,
-      montoEsperado, diferencia, observaciones, id
+      montoEsperado, diferencia, observaciones, empresaId, id
     ]);
 
     res.json({
@@ -291,6 +303,7 @@ export const registrarMovimiento = async (req, res) => {
       observaciones,
       usuario_id
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Validaciones
     if (!caja_id || !tipo_movimiento || !monto || !concepto) {
@@ -308,7 +321,7 @@ export const registrarMovimiento = async (req, res) => {
     }
 
     // Verificar que la caja existe y está abierta
-    const caja = await getOne('SELECT id, estado FROM cajas WHERE id = ?', [caja_id]);
+    const caja = await getOne('SELECT id, estado FROM cajas WHERE empresa_id = ? AND id = ?', [empresaId, caja_id]);
 
     if (!caja) {
       return res.status(404).json({ error: 'Caja no encontrada' });
@@ -322,11 +335,11 @@ export const registrarMovimiento = async (req, res) => {
     await runQuery(`
       INSERT INTO movimientos_caja (
         caja_id, tipo_movimiento, categoria, monto, concepto,
-        numero_comprobante, observaciones, usuario_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        numero_comprobante, observaciones, usuario_id, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       caja_id, tipo_movimiento, categoria, monto, concepto,
-      numero_comprobante, observaciones, usuario_id
+      numero_comprobante, observaciones, usuario_id, empresaId
     ]);
 
     res.status(201).json({ message: 'Movimiento registrado exitosamente' });
@@ -340,8 +353,9 @@ export const registrarMovimiento = async (req, res) => {
 export const getResumenCaja = async (req, res) => {
   try {
     const { caja_id } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    const caja = await getOne('SELECT * FROM cajas WHERE id = ?', [caja_id]);
+    const caja = await getOne('SELECT * FROM cajas WHERE empresa_id = ? AND id = ?', [empresaId, caja_id]);
 
     if (!caja) {
       return res.status(404).json({ error: 'Caja no encontrada' });
@@ -354,8 +368,9 @@ export const getResumenCaja = async (req, res) => {
         COUNT(CASE WHEN tipo_movimiento = 'ingreso' THEN 1 END) as cantidad_ingresos,
         COUNT(CASE WHEN tipo_movimiento = 'egreso' THEN 1 END) as cantidad_egresos
       FROM movimientos_caja
-      WHERE caja_id = ?
-    `, [caja_id]);
+      WHERE empresa_id = ?
+      AND caja_id = ?
+    `, [empresaId, caja_id]);
 
     const montoActual = parseFloat(caja.monto_inicial) + 
                         parseFloat(totales.total_ingresos) - 

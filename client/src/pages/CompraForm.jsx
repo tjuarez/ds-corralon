@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -168,7 +169,7 @@ const CompraForm = () => {
 
       const result = await comprasApi.create(dataToSend);
       showSuccess(`Compra ${result.numero_comprobante} registrada exitosamente`);
-      navigate('/compras');
+      navigate(buildTenantPath('/compras'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -192,7 +193,7 @@ const CompraForm = () => {
           <p style={styles.subtitle}>Registra una nueva compra a proveedor</p>
         </div>
         <button
-          onClick={() => navigate('/compras')}
+          onClick={() => navigate(buildTenantPath('/compras'))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -516,7 +517,7 @@ const CompraForm = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate('/compras')}
+            onClick={() => navigate(buildTenantPath('/compras'))}
             style={styles.cancelButton}
             disabled={loading}
           >

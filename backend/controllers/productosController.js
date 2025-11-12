@@ -1,13 +1,16 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todos los productos (con filtros)
 export const getProductos = async (req, res) => {
   try {
     const { search, categoria_id, activo, stock_bajo } = req.query;
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     let sql = '';
     let params = [];
+    params.push(empresaId);
 
     // ========== CONSULTA SEGÚN ROL Y SUCURSAL ==========
     // Si NO es admin O si es admin CON sucursal activa → mostrar stock de sucursal
@@ -26,10 +29,10 @@ export const getProductos = async (req, res) => {
                COALESCE(ss.stock_actual, 0) as stock_actual,
                (SELECT COUNT(*) FROM productos_precios WHERE producto_id = p.id) as precios_count
         FROM productos p
-        LEFT JOIN categorias c ON p.categoria_id = c.id
-        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
-        LEFT JOIN stock_sucursales ss ON p.id = ss.producto_id AND ss.sucursal_id = ?
-        WHERE 1=1
+        LEFT JOIN categorias c ON p.empresa_id = c.empresa_id and p.categoria_id = c.id
+        LEFT JOIN proveedores prov ON p.empresa_id = prov.empresa_id and p.proveedor_id = prov.id
+        LEFT JOIN stock_sucursales ss ON p.empresa_id = ss.empresa_id and p.id = ss.producto_id AND ss.sucursal_id = ?
+        WHERE p.empresa_id = ?
       `;
       params.push(user.sucursal_id);
     } else {
@@ -40,9 +43,9 @@ export const getProductos = async (req, res) => {
                prov.razon_social as proveedor_nombre,
                (SELECT COUNT(*) FROM productos_precios WHERE producto_id = p.id) as precios_count
         FROM productos p
-        LEFT JOIN categorias c ON p.categoria_id = c.id
-        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
-        WHERE 1=1
+        LEFT JOIN categorias c ON p.empresa_id = c.empresa_id and p.categoria_id = c.id
+        LEFT JOIN proveedores prov ON p.empresa_id = prov.empresa_id and p.proveedor_id = prov.id
+        WHERE p.empresa_id = ?
       `;
     }
 
@@ -89,6 +92,7 @@ export const getProductoById = async (req, res) => {
   try {
     const { id } = req.params;
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     let sql = '';
     let params = [];
@@ -108,12 +112,13 @@ export const getProductoById = async (req, res) => {
                prov.razon_social as proveedor_nombre,
                COALESCE(ss.stock_actual, 0) as stock_actual
         FROM productos p
-        LEFT JOIN categorias c ON p.categoria_id = c.id
-        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
-        LEFT JOIN stock_sucursales ss ON p.id = ss.producto_id AND ss.sucursal_id = ?
-        WHERE p.id = ?
+        LEFT JOIN categorias c ON p.empresa_id = c.empresa_id and p.categoria_id = c.id
+        LEFT JOIN proveedores prov ON p.empresa_id = prov.empresa_id and p.proveedor_id = prov.id
+        LEFT JOIN stock_sucursales ss ON p.empresa_id = ss.empresa_id and p.id = ss.producto_id AND ss.sucursal_id = ?
+        WHERE p.empresa_id = ?
+        AND p.id = ?
       `;
-      params = [user.sucursal_id, id];
+      params = [user.sucursal_id, empresaId, id];
     } else {
       // Admin SIN sucursal activa → Mostrar stock total
       sql = `
@@ -121,11 +126,12 @@ export const getProductoById = async (req, res) => {
                c.nombre as categoria_nombre,
                prov.razon_social as proveedor_nombre
         FROM productos p
-        LEFT JOIN categorias c ON p.categoria_id = c.id
-        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
-        WHERE p.id = ?
+        LEFT JOIN categorias c ON p.empresa_id = c.empresa_id and p.categoria_id = c.id
+        LEFT JOIN proveedores prov ON p.empresa_id = prov.empresa_id and p.proveedor_id = prov.id
+        WHERE p.empresa_id = ?
+        AND p.id = ?
       `;
-      params = [id];
+      params = [empresaId, id];
     }
 
     const producto = await getOne(sql, params);
@@ -138,11 +144,13 @@ export const getProductoById = async (req, res) => {
     const precios = await getAll(
       `SELECT pp.*, lp.nombre as lista_nombre, m.codigo as moneda_codigo, m.simbolo as moneda_simbolo
        FROM productos_precios pp
-       LEFT JOIN listas_precios lp ON pp.lista_precio_id = lp.id
-       LEFT JOIN monedas m ON pp.moneda_id = m.id
-       WHERE pp.producto_id = ? AND (pp.fecha_hasta IS NULL OR pp.fecha_hasta >= date('now'))
+       LEFT JOIN listas_precios lp ON pp.empresa_id = lp.empresa_id and pp.lista_precio_id = lp.id
+       LEFT JOIN monedas m ON pp.empresa_id = m.empresa_id and pp.moneda_id = m.id
+       WHERE pp.empresa_id = ?
+       AND pp.producto_id = ? 
+       AND (pp.fecha_hasta IS NULL OR pp.fecha_hasta >= date('now'))
        ORDER BY lp.id, m.codigo`,
-      [id]
+      [empresaId, id]
     );
 
     // Si es admin SIN sucursal activa, agregar información de stock por sucursal
@@ -151,10 +159,11 @@ export const getProductoById = async (req, res) => {
       stockPorSucursal = await getAll(`
         SELECT ss.*, s.nombre as sucursal_nombre, s.codigo as sucursal_codigo
         FROM stock_sucursales ss
-        LEFT JOIN sucursales s ON ss.sucursal_id = s.id
-        WHERE ss.producto_id = ?
+        LEFT JOIN sucursales s ON ss.empresa_id = s.empresa_id and ss.sucursal_id = s.id
+        WHERE ss.empresa_id = ?
+        AND ss.producto_id = ?
         ORDER BY s.nombre
-      `, [id]);
+      `, [empresaId, id]);
     }
 
     res.json({ 
@@ -189,6 +198,7 @@ export const createProducto = async (req, res) => {
     } = req.body;
 
     const user = req.user; // Usuario autenticado
+    const empresaId = getEmpresaId(req);
 
     // Validaciones
     if (!codigo || !descripcion || !unidad_medida) {
@@ -199,8 +209,8 @@ export const createProducto = async (req, res) => {
 
     // Verificar si el código ya existe
     const existing = await getOne(
-      'SELECT id FROM productos WHERE codigo = ?',
-      [codigo]
+      'SELECT id FROM productos WHERE empresa_id = ? AND codigo = ?',
+      [empresaId, codigo]
     );
 
     if (existing) {
@@ -223,19 +233,19 @@ export const createProducto = async (req, res) => {
       `INSERT INTO productos (
         codigo, descripcion, categoria_id, marca, unidad_medida, 
         stock_minimo, stock_actual, ubicacion, proveedor_id, 
-        imagen_url, observaciones, activo
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        imagen_url, observaciones, activo, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
       [
         codigo, descripcion, categoria_id || null, marca, unidad_medida,
         stock_minimo || 0, stockInicial, ubicacion, proveedor_id || null,
-        imagen_url, observaciones
+        imagen_url, observaciones, empresaId
       ]
     );
 
     const productoId = result.id;
 
     // Obtener todas las sucursales activas
-    const sucursales = await getAll('SELECT id FROM sucursales WHERE activa = 1');
+    const sucursales = await getAll('SELECT id FROM sucursales WHERE empresa_id = ? AND activa = 1', [empresaId]);
     
     // Inicializar stock en todas las sucursales
     for (const sucursal of sucursales) {
@@ -244,9 +254,9 @@ export const createProducto = async (req, res) => {
       const stockSucursal = (sucursal.id === user.sucursal_id) ? stockInicial : 0;
       
       await runQuery(`
-        INSERT INTO stock_sucursales (producto_id, sucursal_id, stock_actual, stock_minimo)
-        VALUES (?, ?, ?, ?)
-      `, [productoId, sucursal.id, stockSucursal, stock_minimo || 0]);
+        INSERT INTO stock_sucursales (producto_id, sucursal_id, stock_actual, stock_minimo, empresa_id)
+        VALUES (?, ?, ?, ?, ?)
+      `, [productoId, sucursal.id, stockSucursal, stock_minimo || 0, empresaId]);
     }
 
     // Si hubo stock inicial, registrar el movimiento
@@ -254,9 +264,9 @@ export const createProducto = async (req, res) => {
       await runQuery(`
         INSERT INTO movimientos_stock (
           producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-          motivo, sucursal_id, usuario_id, fecha
-        ) VALUES (?, 'entrada', ?, 0, ?, 'Stock inicial', ?, ?, CURRENT_TIMESTAMP)
-      `, [productoId, stockInicial, stockInicial, user.sucursal_id, user.id]);
+          motivo, sucursal_id, usuario_id, fecha, empresa_id
+        ) VALUES (?, 'entrada', ?, 0, ?, 'Stock inicial', ?, ?, CURRENT_TIMESTAMP, ?)
+      `, [productoId, stockInicial, stockInicial, user.sucursal_id, user.id, empresaId]);
     }
 
     // Insertar precios si se proporcionan
@@ -264,9 +274,9 @@ export const createProducto = async (req, res) => {
       for (const precio of precios) {
         await runQuery(
           `INSERT INTO productos_precios (
-            producto_id, lista_precio_id, moneda_id, precio, fecha_desde
-          ) VALUES (?, ?, ?, ?, date('now'))`,
-          [productoId, precio.lista_precio_id, precio.moneda_id, precio.precio]
+            producto_id, lista_precio_id, moneda_id, precio, fecha_desde, empresa_id
+          ) VALUES (?, ?, ?, ?, date('now'), ?)`,
+          [productoId, precio.lista_precio_id, precio.moneda_id, precio.precio, empresaId]
         );
       }
     }
@@ -301,9 +311,10 @@ export const updateProducto = async (req, res) => {
     } = req.body;
 
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     // Verificar que existe
-    const producto = await getOne('SELECT id FROM productos WHERE id = ?', [id]);
+    const producto = await getOne('SELECT id FROM productos WHERE empresa_id = ? AND id = ?', [empresaId, id]);
     if (!producto) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
@@ -311,8 +322,8 @@ export const updateProducto = async (req, res) => {
     // Verificar código duplicado
     if (codigo) {
       const existing = await getOne(
-        'SELECT id FROM productos WHERE codigo = ? AND id != ?',
-        [codigo, id]
+        'SELECT id FROM productos WHERE empresa_id = ? AND codigo = ? AND id != ?',
+        [empresaId, codigo, id]
       );
 
       if (existing) {
@@ -329,11 +340,12 @@ export const updateProducto = async (req, res) => {
         unidad_medida = ?, stock_minimo = ?, 
         ubicacion = ?, proveedor_id = ?, imagen_url = ?, 
         observaciones = ?, activo = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?`,
+      WHERE empresa_id = ?
+      AND id = ?`,
       [
         codigo, descripcion, categoria_id || null, marca, unidad_medida,
         stock_minimo, ubicacion, proveedor_id || null,
-        imagen_url, observaciones, activo !== undefined ? activo : 1, id
+        imagen_url, observaciones, activo !== undefined ? activo : 1, empresaId, id
       ]
     );
 
@@ -345,8 +357,8 @@ export const updateProducto = async (req, res) => {
 
       // Obtener stock actual de esta sucursal
       const stockSucursal = await getOne(
-        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-        [id, user.sucursal_id]
+        'SELECT stock_actual FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+        [empresaId, id, user.sucursal_id]
       );
 
       if (stockSucursal) {
@@ -357,27 +369,27 @@ export const updateProducto = async (req, res) => {
         if (diferencia !== 0) {
           // Actualizar stock en stock_sucursales
           await runQuery(
-            'UPDATE stock_sucursales SET stock_actual = ?, stock_minimo = ? WHERE producto_id = ? AND sucursal_id = ?',
-            [nuevoStock, stock_minimo || 0, id, user.sucursal_id]
+            'UPDATE stock_sucursales SET stock_actual = ?, stock_minimo = ? WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+            [nuevoStock, stock_minimo || 0, empresaId, id, user.sucursal_id]
           );
 
           // Registrar movimiento de stock
           await runQuery(`
             INSERT INTO movimientos_stock (
               producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-              motivo, sucursal_id, usuario_id, fecha
-            ) VALUES (?, 'ajuste', ?, ?, ?, 'Ajuste desde edición de producto', ?, ?, CURRENT_TIMESTAMP)
-          `, [id, Math.abs(diferencia), stockAnterior, nuevoStock, user.sucursal_id, user.id]);
+              motivo, sucursal_id, usuario_id, fecha, empresa_id
+            ) VALUES (?, 'ajuste', ?, ?, ?, 'Ajuste desde edición de producto', ?, ?, CURRENT_TIMESTAMP, ?)
+          `, [id, Math.abs(diferencia), stockAnterior, nuevoStock, user.sucursal_id, user.id, empresaId]);
 
           // Recalcular stock_actual total del producto (suma de todas las sucursales)
           const totalStock = await getOne(
-            'SELECT SUM(stock_actual) as total FROM stock_sucursales WHERE producto_id = ?',
-            [id]
+            'SELECT SUM(stock_actual) as total FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ?',
+            [empresaId, id]
           );
 
           await runQuery(
-            'UPDATE productos SET stock_actual = ? WHERE id = ?',
-            [totalStock.total || 0, id]
+            'UPDATE productos SET stock_actual = ? WHERE empresa_id = ? AND id = ?',
+            [totalStock.total || 0, empresaId, id]
           );
         }
       }
@@ -386,8 +398,8 @@ export const updateProducto = async (req, res) => {
     // Actualizar stock_minimo en todas las sucursales
     if (stock_minimo !== undefined) {
       await runQuery(
-        'UPDATE stock_sucursales SET stock_minimo = ? WHERE producto_id = ?',
-        [stock_minimo || 0, id]
+        'UPDATE stock_sucursales SET stock_minimo = ? WHERE empresa_id = ? AND producto_id = ?',
+        [stock_minimo || 0, empresaId, id]
       );
     }
 
@@ -402,16 +414,17 @@ export const updateProducto = async (req, res) => {
 export const deleteProducto = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    const producto = await getOne('SELECT id FROM productos WHERE id = ?', [id]);
+    const producto = await getOne('SELECT id FROM productos WHERE empresa_id = ? AND id = ?', [empresaId, id]);
     if (!producto) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
 
     // Verificar si tiene ventas asociadas
     const ventas = await getOne(
-      'SELECT COUNT(*) as count FROM ventas_detalle WHERE producto_id = ?',
-      [id]
+      'SELECT COUNT(*) as count FROM ventas_detalle WHERE empresa_id = ? AND producto_id = ?',
+      [empresaId, id]
     );
 
     if (ventas.count > 0) {
@@ -421,8 +434,8 @@ export const deleteProducto = async (req, res) => {
     }
 
     await runQuery(
-      'UPDATE productos SET activo = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [id]
+      'UPDATE productos SET activo = 0, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     res.json({ message: 'Producto eliminado exitosamente' });
@@ -437,9 +450,10 @@ export const updatePrecios = async (req, res) => {
   try {
     const { id } = req.params;
     const { precios } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Verificar que el producto existe
-    const producto = await getOne('SELECT id FROM productos WHERE id = ?', [id]);
+    const producto = await getOne('SELECT id FROM productos WHERE empresa_id = ? AND id = ?', [empresaId, id]);
     if (!producto) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
@@ -448,8 +462,10 @@ export const updatePrecios = async (req, res) => {
     await runQuery(
       `UPDATE productos_precios 
        SET fecha_hasta = date('now') 
-       WHERE producto_id = ? AND fecha_hasta IS NULL`,
-      [id]
+       WHERE empresa_id = ? 
+       AND producto_id = ? 
+       AND fecha_hasta IS NULL`,
+      [empresaId, id]
     );
 
     // Insertar nuevos precios
@@ -457,9 +473,9 @@ export const updatePrecios = async (req, res) => {
       for (const precio of precios) {
         await runQuery(
           `INSERT INTO productos_precios (
-            producto_id, lista_precio_id, moneda_id, precio, fecha_desde
-          ) VALUES (?, ?, ?, ?, date('now'))`,
-          [id, precio.lista_precio_id, precio.moneda_id, precio.precio]
+            producto_id, lista_precio_id, moneda_id, precio, fecha_desde, empresa_id
+          ) VALUES (?, ?, ?, ?, date('now'), ?)`,
+          [id, precio.lista_precio_id, precio.moneda_id, precio.precio, empresaId]
         );
       }
     }

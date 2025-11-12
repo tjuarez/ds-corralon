@@ -1,11 +1,11 @@
-import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+import { fetchWithTenant } from '../utils/fetchWithTenant';
 
 const API_URL = '/api/usuarios';
 
 export const usuariosApi = {
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetchWithSucursal(`${API_URL}?${params}`, {
+    const response = await fetchWithTenant(`${API_URL}?${params}`, {
       credentials: 'include',
     });
 
@@ -18,7 +18,7 @@ export const usuariosApi = {
   },
 
   getById: async (id) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}`, {
       credentials: 'include',
     });
 
@@ -31,7 +31,7 @@ export const usuariosApi = {
   },
 
   create: async (usuarioData) => {
-    const response = await fetchWithSucursal(API_URL, {
+    const response = await fetchWithTenant(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -49,7 +49,7 @@ export const usuariosApi = {
   },
 
   update: async (id, usuarioData) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ export const usuariosApi = {
   },
 
   toggle: async (id) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}/toggle`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}/toggle`, {
       method: 'PATCH',
       credentials: 'include',
     });
@@ -81,7 +81,7 @@ export const usuariosApi = {
   },
 
   delete: async (id) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -95,7 +95,7 @@ export const usuariosApi = {
   },
 
   cambiarPassword: async (id, passwords) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}/cambiar-password`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}/cambiar-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

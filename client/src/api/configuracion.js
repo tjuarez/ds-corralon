@@ -1,11 +1,11 @@
-import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+import { fetchWithTenant } from '../utils/fetchWithTenant';
 
 const API_URL = '/api';
 
 export const configuracionApi = {
   // Obtener toda la configuración
   getAll: async () => {
-    const response = await fetchWithSucursal(`${API_URL}/configuracion`, {
+    const response = await fetchWithTenant(`${API_URL}/configuracion`, {
       credentials: 'include',
     });
 
@@ -19,7 +19,7 @@ export const configuracionApi = {
 
   // Actualizar configuración
   update: async (configuraciones) => {
-    const response = await fetchWithSucursal(`${API_URL}/configuracion`, {
+    const response = await fetchWithTenant(`${API_URL}/configuracion`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -38,7 +38,7 @@ export const configuracionApi = {
 
   // Obtener monedas
   getMonedas: async () => {
-    const response = await fetchWithSucursal(`${API_URL}/configuracion/monedas/list`, {
+    const response = await fetchWithTenant(`${API_URL}/configuracion/monedas/list`, {
       credentials: 'include',
     });
 
@@ -52,7 +52,7 @@ export const configuracionApi = {
 
   // Actualizar cotización
   updateCotizacion: async (cotizacion_usd_ars) => {
-    const response = await fetchWithSucursal(`${API_URL}/configuracion/cotizacion/update`, {
+    const response = await fetchWithTenant(`${API_URL}/configuracion/cotizacion/update`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -71,7 +71,7 @@ export const configuracionApi = {
 
   // Obtener cotización actual
   getCotizacionActual: async () => {
-    const response = await fetchWithSucursal(`${API_URL}/configuracion/cotizacion_usd_ars`, {
+    const response = await fetchWithTenant(`${API_URL}/configuracion/cotizacion_usd_ars`, {
       credentials: 'include',
     });
 

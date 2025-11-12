@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authApi } from '../api/auth';
+import { getTenantFromUrl } from '../utils/tenantHelper';
 
 const AuthContext = createContext();
 
@@ -45,8 +46,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (username, password) => {
-    const response = await authApi.login(username, password);
+  const login = async (tenant, username, password) => {
+    const response = await authApi.login(tenant, username, password);
     setUser(response.user);
     
     // Si el usuario NO es admin, establecer su sucursal automáticamente
@@ -89,11 +90,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Obtener tenant actual de la URL
+  const getTenant = () => {
+    return getTenantFromUrl();
+  };
+
   const value = {
     user,
     loading,
     sucursalActiva,
     setSucursalActiva,
+    getTenant, // ← AGREGAR
     login,
     logout,
     register,

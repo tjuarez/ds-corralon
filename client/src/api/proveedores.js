@@ -1,11 +1,11 @@
-import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+import { fetchWithTenant } from '../utils/fetchWithTenant';
 
 const API_URL = '/api/proveedores';
 
 export const proveedoresApi = {
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetchWithSucursal(`${API_URL}?${params}`, {
+    const response = await fetchWithTenant(`${API_URL}?${params}`, {
       credentials: 'include',
     });
 
@@ -18,7 +18,7 @@ export const proveedoresApi = {
   },
 
   getById: async (id) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}`, {
       credentials: 'include',
     });
 
@@ -31,7 +31,7 @@ export const proveedoresApi = {
   },
 
   create: async (proveedorData) => {
-    const response = await fetchWithSucursal(API_URL, {
+    const response = await fetchWithTenant(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -49,7 +49,7 @@ export const proveedoresApi = {
   },
 
   update: async (id, proveedorData) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ export const proveedoresApi = {
   },
 
   delete: async (id) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -81,7 +81,7 @@ export const proveedoresApi = {
   },
 
   addContacto: async (proveedorId, contactoData) => {
-    const response = await fetchWithSucursal(`${API_URL}/${proveedorId}/contactos`, {
+    const response = await fetchWithTenant(`${API_URL}/${proveedorId}/contactos`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -99,7 +99,7 @@ export const proveedoresApi = {
   },
 
   deleteContacto: async (contactoId) => {
-    const response = await fetchWithSucursal(`${API_URL}/contactos/${contactoId}`, {
+    const response = await fetchWithTenant(`${API_URL}/contactos/${contactoId}`, {
       method: 'DELETE',
       credentials: 'include',
     });

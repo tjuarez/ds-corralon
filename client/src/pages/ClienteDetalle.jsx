@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { clientesApi } from '../api/clientes';
 import Layout from '../components/Layout';
@@ -26,7 +27,7 @@ const ClienteDetalle = () => {
       setCliente(data.cliente);
     } catch (error) {
       showError(error.message);
-      navigate('/clientes');
+      navigate(buildTenantPath('/clientes'));
     } finally {
       setLoading(false);
     }
@@ -42,7 +43,7 @@ const ClienteDetalle = () => {
     try {
       await clientesApi.delete(id);
       showSuccess('Cliente eliminado exitosamente');
-      navigate('/clientes');
+      navigate(buildTenantPath('/clientes'));
     } catch (error) {
       showError(error.message);
     }
@@ -92,14 +93,14 @@ const ClienteDetalle = () => {
         </div>
         <div style={styles.headerActions}>
           <button
-            onClick={() => navigate('/clientes')}
+            onClick={() => navigate(buildTenantPath('/clientes'))}
             style={styles.backButton}
           >
             <ArrowLeft size={18} style={{ marginRight: '6px' }} />
             {t('back')}
           </button>
           <button
-            onClick={() => navigate(`/clientes/${id}/editar`)}
+            onClick={() => navigate(buildTenantPath(`/clientes/${id}/editar`))}
             style={styles.editButton}
           >
             <Edit size={18} style={{ marginRight: '6px' }} />

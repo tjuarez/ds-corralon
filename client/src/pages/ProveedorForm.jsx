@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { proveedoresApi } from '../api/proveedores';
@@ -91,7 +92,7 @@ const ProveedorForm = () => {
       }
     } catch (error) {
       showError(error.message);
-      navigate('/proveedores');
+      navigate(buildTenantPath('/proveedores'));
     } finally {
       setLoadingData(false);
     }
@@ -124,7 +125,7 @@ const ProveedorForm = () => {
         showSuccess('Proveedor creado exitosamente');
       }
 
-      navigate('/proveedores');
+      navigate(buildTenantPath('/proveedores'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -155,7 +156,7 @@ const ProveedorForm = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/proveedores')}
+          onClick={() => navigate(buildTenantPath('/proveedores'))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -385,7 +386,7 @@ const ProveedorForm = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate('/proveedores')}
+            onClick={() => navigate(buildTenantPath('/proveedores'))}
             style={styles.cancelButton}
             disabled={loading}
           >

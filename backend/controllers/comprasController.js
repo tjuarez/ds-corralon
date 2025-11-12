@@ -1,12 +1,14 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
 import { actualizarStockTotal } from './stockSucursalesController.js';
 import { getCotizacionActual } from '../utils/cotizacion.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todas las compras (con búsqueda y filtros)
 export const getCompras = async (req, res) => {
   try {
     const { search, fecha_desde, fecha_hasta, proveedor_id, estado, sucursal_id } = req.query;
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT c.*, 
@@ -16,13 +18,13 @@ export const getCompras = async (req, res) => {
              u.nombre || ' ' || u.apellido as usuario_nombre,
              s.nombre as sucursal_nombre
       FROM compras c
-      LEFT JOIN proveedores p ON c.proveedor_id = p.id
-      LEFT JOIN monedas m ON c.moneda_id = m.id
-      LEFT JOIN usuarios u ON c.usuario_id = u.id
-      LEFT JOIN sucursales s ON c.sucursal_id = s.id
-      WHERE 1=1
+      LEFT JOIN proveedores p ON c.empresa_id = p.empresa_id AND c.proveedor_id = p.id
+      LEFT JOIN monedas m ON c.empresa_id = m.empresa_id AND c.moneda_id = m.id
+      LEFT JOIN usuarios u ON c.empresa_id = u.empresa_id AND c.usuario_id = u.id
+      LEFT JOIN sucursales s ON c.empresa_id = s.empresa_id AND c.sucursal_id = s.id
+      WHERE c.empresa_id = ?
     `;
-    const params = [];
+    const params = [empresaId];
 
     // FILTRO CRÍTICO: Control por sucursal
     if (user.rol !== 'admin' || user.sucursal_id) {
@@ -85,6 +87,7 @@ export const getCompras = async (req, res) => {
 export const getCompraById = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const compra = await getOne(`
       SELECT c.*, 
@@ -99,12 +102,13 @@ export const getCompraById = async (req, res) => {
              s.nombre as sucursal_nombre,
              c.cotizacion_momento
       FROM compras c
-      LEFT JOIN proveedores p ON c.proveedor_id = p.id
-      LEFT JOIN monedas m ON c.moneda_id = m.id
-      LEFT JOIN usuarios u ON c.usuario_id = u.id
-      LEFT JOIN sucursales s ON c.sucursal_id = s.id
-      WHERE c.id = ?
-    `, [id]);
+      LEFT JOIN proveedores p ON c.empresa_id = p.empresa_id AND c.proveedor_id = p.id
+      LEFT JOIN monedas m ON c.empresa_id = m.empresa_id AND c.moneda_id = m.id
+      LEFT JOIN usuarios u ON c.empresa_id = u.empresa_id AND c.usuario_id = u.id
+      LEFT JOIN sucursales s ON c.empresa_id = s.empresa_id AND c.sucursal_id = s.id
+      WHERE c.empresa_id = ?
+      AND c.id = ?
+    `, [empresaId, id]);
 
     if (!compra) {
       return res.status(404).json({ error: 'Compra no encontrada' });
@@ -117,10 +121,11 @@ export const getCompraById = async (req, res) => {
              p.descripcion as producto_descripcion,
              p.unidad_medida as producto_unidad
       FROM compras_detalle cd
-      LEFT JOIN productos p ON cd.producto_id = p.id
-      WHERE cd.compra_id = ?
+      LEFT JOIN productos p ON cd.empresa_id = p.empresa_id AND cd.producto_id = p.id
+      WHERE cd.empresa_id = ?
+      AND cd.compra_id = ?
       ORDER BY cd.id ASC
-    `, [id]);
+    `, [empresaId, id]);
 
     res.json({ 
       compra: { 
@@ -137,12 +142,14 @@ export const getCompraById = async (req, res) => {
 // Generar número de comprobante
 const generateNumeroComprobante = async () => {
   const year = new Date().getFullYear();
+  const empresaId = getEmpresaId(req);
   
   const lastCompra = await getOne(
     `SELECT numero_comprobante FROM compras 
-     WHERE numero_comprobante LIKE ? 
+     WHERE empresa_id = ?
+     AND numero_comprobante LIKE ? 
      ORDER BY numero_comprobante DESC LIMIT 1`,
-    [`COM-${year}-%`]
+    [empresaId, `COM-${year}-%`]
   );
 
   let nextNumber = 1;
@@ -172,6 +179,7 @@ export const createCompra = async (req, res) => {
     } = req.body;
 
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     // VALIDACIÓN CRÍTICA: Usuario debe tener sucursal
     if (!user.sucursal_id) {
@@ -188,7 +196,7 @@ export const createCompra = async (req, res) => {
     }
 
     // Verificar que el proveedor existe
-    const proveedor = await getOne('SELECT id FROM proveedores WHERE id = ?', [proveedor_id]);
+    const proveedor = await getOne('SELECT id FROM proveedores WHERE empresa_id = ? AND id = ?', [empresaId, proveedor_id]);
     if (!proveedor) {
       return res.status(404).json({ error: 'Proveedor no encontrado' });
     }
@@ -196,8 +204,8 @@ export const createCompra = async (req, res) => {
     // Verificar que los productos existen
     for (const item of detalle) {
       const producto = await getOne(
-        'SELECT id, codigo, descripcion FROM productos WHERE id = ?',
-        [item.producto_id]
+        'SELECT id, codigo, descripcion FROM productos WHERE empresa_id = ? AND id = ?',
+        [empresaId, item.producto_id]
       );
 
       if (!producto) {
@@ -230,12 +238,12 @@ export const createCompra = async (req, res) => {
       INSERT INTO compras (
         numero_comprobante, numero_factura, tipo_comprobante, proveedor_id, 
         fecha, moneda_id, subtotal, descuento_porcentaje, descuento_monto, 
-        total, forma_pago, estado, observaciones, usuario_id, sucursal_id, cotizacion_momento
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'recibida', ?, ?, ?, ?)
+        total, forma_pago, estado, observaciones, usuario_id, sucursal_id, cotizacion_momento, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'recibida', ?, ?, ?, ?, ?)
     `, [
       numero_comprobante, numero_factura, tipo_comprobante, proveedor_id,
       fecha, moneda_id, subtotal, descuento_porcentaje || 0, descuentoMonto, 
-      total, forma_pago, observaciones, usuario_id, user.sucursal_id, cotizacionMomento
+      total, forma_pago, observaciones, usuario_id, user.sucursal_id, cotizacionMomento, empresaId
     ]);
 
     const compraId = result.id;
@@ -250,18 +258,18 @@ export const createCompra = async (req, res) => {
       await runQuery(`
         INSERT INTO compras_detalle (
           compra_id, producto_id, descripcion, cantidad,
-          precio_unitario, descuento_porcentaje, subtotal
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          precio_unitario, descuento_porcentaje, subtotal, empresa_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         compraId, item.producto_id, item.descripcion,
         item.cantidad, item.precio_unitario,
-        item.descuento_porcentaje || 0, itemTotal
+        item.descuento_porcentaje || 0, itemTotal, empresaId
       ]);
 
       // Verificar si existe stock para este producto en esta sucursal
       let stockSucursal = await getOne(
-        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-        [item.producto_id, user.sucursal_id]
+        'SELECT stock_actual FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+        [empresaId, item.producto_id, user.sucursal_id]
       );
 
       let stockAnterior = 0;
@@ -269,9 +277,9 @@ export const createCompra = async (req, res) => {
       if (!stockSucursal) {
         // Si no existe, crear el registro
         await runQuery(`
-          INSERT INTO stock_sucursales (producto_id, sucursal_id, stock_actual)
-          VALUES (?, ?, 0)
-        `, [item.producto_id, user.sucursal_id]);
+          INSERT INTO stock_sucursales (producto_id, sucursal_id, stock_actual, empresa_id)
+          VALUES (?, ?, 0, ?)
+        `, [item.producto_id, user.sucursal_id, empresaId]);
         stockAnterior = 0;
       } else {
         stockAnterior = stockSucursal.stock_actual;
@@ -281,19 +289,19 @@ export const createCompra = async (req, res) => {
 
       // Actualizar stock en la sucursal
       await runQuery(
-        'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
-        [stockNuevo, item.producto_id, user.sucursal_id]
+        'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+        [stockNuevo, empresaId, item.producto_id, user.sucursal_id]
       );
 
       // Registrar movimiento de stock con sucursal_id
       await runQuery(`
         INSERT INTO movimientos_stock (
           producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-          motivo, compra_id, usuario_id, sucursal_id, fecha
-        ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          motivo, compra_id, usuario_id, sucursal_id, fecha, empresa_id
+        ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
       `, [
         item.producto_id, item.cantidad, stockAnterior, stockNuevo,
-        `Compra ${numero_comprobante}`, compraId, usuario_id, user.sucursal_id
+        `Compra ${numero_comprobante}`, compraId, usuario_id, user.sucursal_id, empresaId
       ]);
 
       // Actualizar stock total del producto
@@ -301,8 +309,8 @@ export const createCompra = async (req, res) => {
 
       // Actualizar precio de costo
       await runQuery(
-        'UPDATE productos SET precio_costo = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [item.precio_unitario, item.producto_id]
+        'UPDATE productos SET precio_costo = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+        [item.precio_unitario, empresaId, item.producto_id]
       );
     }
 
@@ -322,20 +330,21 @@ export const updateEstado = async (req, res) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
+    const empresaId = getEmpresaId(req);
 
     const estadosValidos = ['pendiente', 'recibida', 'pagada', 'anulada'];
     if (!estadosValidos.includes(estado)) {
       return res.status(400).json({ error: 'Estado inválido' });
     }
 
-    const compra = await getOne('SELECT id FROM compras WHERE id = ?', [id]);
+    const compra = await getOne('SELECT id FROM compras WHERE empresa_id = ? AND id = ?', [empresaId, id]);
     if (!compra) {
       return res.status(404).json({ error: 'Compra no encontrada' });
     }
 
     await runQuery(
-      'UPDATE compras SET estado = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [estado, id]
+      'UPDATE compras SET estado = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+      [estado, empresaId, id]
     );
 
     res.json({ message: 'Estado actualizado exitosamente' });
@@ -350,10 +359,11 @@ export const anularCompra = async (req, res) => {
   try {
     const { id } = req.params;
     const { usuario_id } = req.body;
+    const empresaId = getEmpresaId(req);
 
     const compra = await getOne(
-      'SELECT id, estado, numero_comprobante, sucursal_id FROM compras WHERE id = ?',
-      [id]
+      'SELECT id, estado, numero_comprobante, sucursal_id FROM compras WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     if (!compra) {
@@ -366,15 +376,15 @@ export const anularCompra = async (req, res) => {
 
     // Obtener detalle para revertir stock
     const detalle = await getAll(
-      'SELECT producto_id, cantidad FROM compras_detalle WHERE compra_id = ?',
-      [id]
+      'SELECT producto_id, cantidad FROM compras_detalle WHERE empresa_id = ? AND compra_id = ?',
+      [empresaId, id]
     );
 
     // ========== REVERTIR STOCK EN LA SUCURSAL ==========
     for (const item of detalle) {
       const stockSucursal = await getOne(
-        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-        [item.producto_id, compra.sucursal_id]
+        'SELECT stock_actual FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+        [empresaId, item.producto_id, compra.sucursal_id]
       );
 
       if (!stockSucursal) {
@@ -393,19 +403,19 @@ export const anularCompra = async (req, res) => {
       }
 
       await runQuery(
-        'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
-        [stockNuevo, item.producto_id, compra.sucursal_id]
+        'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+        [stockNuevo, empresaId, item.producto_id, compra.sucursal_id]
       );
 
       // Registrar movimiento de stock
       await runQuery(`
         INSERT INTO movimientos_stock (
           producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-          motivo, compra_id, usuario_id, sucursal_id, fecha
-        ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          motivo, compra_id, usuario_id, sucursal_id, fecha, empresa_id
+        ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
       `, [
         item.producto_id, item.cantidad, stockAnterior, stockNuevo,
-        `Anulación compra ${compra.numero_comprobante}`, id, usuario_id, compra.sucursal_id
+        `Anulación compra ${compra.numero_comprobante}`, id, usuario_id, compra.sucursal_id, empresaId
       ]);
 
       // Actualizar stock total del producto
@@ -414,8 +424,8 @@ export const anularCompra = async (req, res) => {
 
     // Marcar compra como anulada
     await runQuery(
-      'UPDATE compras SET estado = \'anulada\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [id]
+      'UPDATE compras SET estado = \'anulada\', updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     res.json({ message: 'Compra anulada exitosamente. Stock revertido.' });

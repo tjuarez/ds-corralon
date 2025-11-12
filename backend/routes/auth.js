@@ -4,7 +4,8 @@ import {
   login, 
   logout, 
   getCurrentUser,
-  changePassword 
+  changePassword,
+  getEmpresas
 } from '../controllers/authController.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -12,6 +13,7 @@ import { authLimiter } from '../middleware/rateLimiter.js';
 const router = express.Router();
 
 // Rutas públicas (con rate limiting)
+router.get('/empresas', getEmpresas);  // ← CAMBIO: POST → GET
 router.post('/register', authLimiter, register);
 router.post('/login', authLimiter, login);
 

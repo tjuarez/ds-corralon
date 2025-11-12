@@ -1,4 +1,5 @@
 import { getAll, getOne } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener movimientos de stock con filtros
 export const getMovimientos = async (req, res) => {
@@ -11,6 +12,7 @@ export const getMovimientos = async (req, res) => {
       fecha_hasta,
       search 
     } = req.query;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT 
@@ -21,12 +23,12 @@ export const getMovimientos = async (req, res) => {
         s.nombre as sucursal_nombre,
         u.nombre || ' ' || u.apellido as usuario_nombre
       FROM movimientos_stock ms
-      LEFT JOIN productos p ON ms.producto_id = p.id
-      LEFT JOIN sucursales s ON ms.sucursal_id = s.id
-      LEFT JOIN usuarios u ON ms.usuario_id = u.id
-      WHERE 1=1
+      LEFT JOIN productos p ON ms.empresa_id = p.empresa_id AND ms.producto_id = p.id
+      LEFT JOIN sucursales s ON ms.empresa_id = s.empresa_id AND ms.sucursal_id = s.id
+      LEFT JOIN usuarios u ON ms.empresa_id = u.empresa_id AND ms.usuario_id = u.id
+      WHERE ms.empresa_id = ?
     `;
-    const params = [];
+    const params = [empresaId];
 
     // Filtro por producto
     if (producto_id) {
@@ -79,6 +81,7 @@ export const getMovimientos = async (req, res) => {
 export const getResumen = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, sucursal_id } = req.query;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT 
@@ -86,9 +89,9 @@ export const getResumen = async (req, res) => {
         COUNT(*) as cantidad_movimientos,
         SUM(cantidad) as cantidad_total
       FROM movimientos_stock
-      WHERE 1=1
+      WHERE empresa_id = ?
     `;
-    const params = [];
+    const params = [empresaId];
 
     if (fecha_desde) {
       sql += ` AND DATE(fecha) >= DATE(?)`;

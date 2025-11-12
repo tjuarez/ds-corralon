@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { productosApi } from '../api/productos';
@@ -96,7 +97,7 @@ const Productos = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/productos/nuevo')}
+          onClick={() => navigate(buildTenantPath('/productos/nuevo'))}
           style={styles.addButton}
         >
           <Plus size={18} style={{ marginRight: '6px' }} />
@@ -152,7 +153,7 @@ const Productos = () => {
           <Package size={48} color="#9ca3af" />
           <p style={styles.noDataText}>{t('noData')}</p>
           <button
-            onClick={() => navigate('/productos/nuevo')}
+            onClick={() => navigate(buildTenantPath('/productos/nuevo'))}
             style={styles.addButtonSecondary}
           >
             Crear primer producto
@@ -231,14 +232,14 @@ const Productos = () => {
 
                 <div style={styles.cardFooter}>
                   <button
-                    onClick={() => navigate(`/productos/${producto.id}`)}
+                    onClick={() => navigate(buildTenantPath(`/productos/${producto.id}`))}
                     style={styles.viewButton}
                   >
                     <Eye size={16} style={{ marginRight: '6px' }} />
                     Ver
                   </button>
                   <button
-                    onClick={() => navigate(`/productos/${producto.id}/editar`)}
+                    onClick={() => navigate(buildTenantPath(`/productos/${producto.id}/editar`))}
                     style={styles.editButton}
                   >
                     <Edit size={16} style={{ marginRight: '6px' }} />

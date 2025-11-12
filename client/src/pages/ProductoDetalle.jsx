@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { productosApi } from '../api/productos';
@@ -26,7 +27,7 @@ const ProductoDetalle = () => {
       setProducto(data.producto);
     } catch (error) {
       showError(error.message);
-      navigate('/productos');
+      navigate(buildTenantPath('/productos'));
     } finally {
       setLoading(false);
     }
@@ -42,7 +43,7 @@ const ProductoDetalle = () => {
     try {
       await productosApi.delete(id);
       showSuccess('Producto eliminado exitosamente');
-      navigate('/productos');
+      navigate(buildTenantPath('/productos'));
     } catch (error) {
       showError(error.message);
     }
@@ -117,14 +118,14 @@ const ProductoDetalle = () => {
         </div>
         <div style={styles.headerActions}>
           <button
-            onClick={() => navigate('/productos')}
+            onClick={() => navigate(buildTenantPath('/productos'))}
             style={styles.backButton}
           >
             <ArrowLeft size={18} style={{ marginRight: '6px' }} />
             {t('back')}
           </button>
           <button
-            onClick={() => navigate(`/productos/${id}/editar`)}
+            onClick={() => navigate(buildTenantPath(`/productos/${id}/editar`))}
             style={styles.editButton}
           >
             <Edit size={18} style={{ marginRight: '6px' }} />

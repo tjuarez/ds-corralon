@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { presupuestosApi } from '../api/presupuestos';
 import Layout from '../components/Layout';
+import { fetchWithTenant } from '../utils/fetchWithTenant';
 import {
   ArrowLeft,
   Edit,
@@ -47,7 +49,7 @@ const PresupuestoDetalle = () => {
       setPresupuesto(data.presupuesto);
     } catch (error) {
       showError(error.message);
-      navigate('/presupuestos');
+      navigate(buildTenantPath('/presupuestos'));
     } finally {
       setLoading(false);
     }
@@ -63,7 +65,7 @@ const PresupuestoDetalle = () => {
     try {
       await presupuestosApi.delete(id);
       showSuccess('Presupuesto eliminado exitosamente');
-      navigate('/presupuestos');
+      navigate(buildTenantPath('/presupuestos'));
     } catch (error) {
       showError(error.message);
     }
@@ -106,7 +108,7 @@ const PresupuestoDetalle = () => {
 
     setSendingEmail(true);
     try {
-      const response = await fetch(`/api/presupuestos/${id}/enviar-email`, {
+      const response = await fetchWithTenant(`/api/presupuestos/${id}/enviar-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -212,7 +214,7 @@ const PresupuestoDetalle = () => {
           <p style={styles.subtitle}>Detalles completos del presupuesto</p>
         </div>
         <div style={styles.headerActions}>
-          <button onClick={() => navigate('/presupuestos')} style={styles.backButton}>
+          <button onClick={() => navigate(buildTenantPath('/presupuestos'))} style={styles.backButton}>
             <ArrowLeft size={18} style={{ marginRight: '6px' }} />
             Volver
           </button>
@@ -227,7 +229,7 @@ const PresupuestoDetalle = () => {
           {presupuesto.estado !== 'convertido' && (
             <>
               <button
-                onClick={() => navigate(`/presupuestos/${id}/editar`)}
+                onClick={() => navigate(buildTenantPath(`/presupuestos/${id}/editar`))}
                 style={styles.editButton}
               >
                 <Edit size={18} style={{ marginRight: '6px' }} />
@@ -269,7 +271,7 @@ const PresupuestoDetalle = () => {
         {presupuesto.estado === 'aprobado' && (
           <div style={styles.statusActions}>
             <button
-              onClick={() => navigate('/ventas/nueva', { state: { presupuestoId: presupuesto.id } })}
+              onClick={() => navigate(buildTenantPath('/ventas/nueva'), { state: { presupuestoId: presupuesto.id } })}
               style={styles.convertButton}
             >
               <ShoppingCart size={18} style={{ marginRight: '6px' }} />

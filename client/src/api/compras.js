@@ -1,11 +1,11 @@
-import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+import { fetchWithTenant } from '../utils/fetchWithTenant';
 
 const API_URL = '/api/compras';
 
 export const comprasApi = {
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetchWithSucursal(`${API_URL}?${params}`, {
+    const response = await fetchWithTenant(`${API_URL}?${params}`, {
       credentials: 'include',
     });
 
@@ -18,7 +18,7 @@ export const comprasApi = {
   },
 
   getById: async (id) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}`, {
       credentials: 'include',
     });
 
@@ -31,7 +31,7 @@ export const comprasApi = {
   },
 
   create: async (compraData) => {
-    const response = await fetchWithSucursal(API_URL, {
+    const response = await fetchWithTenant(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -49,7 +49,7 @@ export const comprasApi = {
   },
 
   updateEstado: async (id, estado) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}/estado`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}/estado`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ export const comprasApi = {
   },
 
   anular: async (id, usuario_id) => {
-    const response = await fetchWithSucursal(`${API_URL}/${id}/anular`, {
+    const response = await fetchWithTenant(`${API_URL}/${id}/anular`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

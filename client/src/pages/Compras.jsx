@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -130,7 +131,7 @@ const Compras = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/compras/nueva')}
+          onClick={() => navigate(buildTenantPath('/compras/nueva'))}
           style={styles.addButton}
         >
           <Plus size={18} style={{ marginRight: '6px' }} />
@@ -184,7 +185,7 @@ const Compras = () => {
           </p>
           {!search && !filtroSucursal && (
             <button
-              onClick={() => navigate('/compras/nueva')}
+              onClick={() => navigate(buildTenantPath('/compras/nueva'))}
               style={styles.addButtonSecondary}
             >
               Registrar primera compra
@@ -248,7 +249,7 @@ const Compras = () => {
 
               <div style={styles.cardFooter}>
                 <button
-                  onClick={() => navigate(`/compras/${compra.id}`)}
+                  onClick={() => navigate(buildTenantPath(`/compras/${compra.id}`))}
                   style={styles.viewButton}
                 >
                   <Eye size={16} style={{ marginRight: '6px' }} />

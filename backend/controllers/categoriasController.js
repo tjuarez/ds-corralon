@@ -1,12 +1,14 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todas las categorías (árbol jerárquico)
 export const getCategorias = async (req, res) => {
   try {
     const { activa } = req.query;
+    const empresaId = getEmpresaId(req);
 
-    let sql = 'SELECT * FROM categorias WHERE 1=1';
-    const params = [];
+    let sql = 'SELECT * FROM categorias WHERE empresa_id = ?';
+    const params = [empresaId];
 
     if (activa !== undefined) {
       sql += ' AND activa = ?';
@@ -46,10 +48,11 @@ export const getCategorias = async (req, res) => {
 export const getCategoriaById = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const categoria = await getOne(
-      'SELECT * FROM categorias WHERE id = ?',
-      [id]
+      'SELECT * FROM categorias WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     if (!categoria) {
@@ -58,8 +61,8 @@ export const getCategoriaById = async (req, res) => {
 
     // Obtener productos de esta categoría
     const productos = await getAll(
-      'SELECT COUNT(*) as count FROM productos WHERE categoria_id = ?',
-      [id]
+      'SELECT COUNT(*) as count FROM productos WHERE empresa_id = ? AND categoria_id = ?',
+      [empresaId, id]
     );
 
     res.json({ categoria: { ...categoria, productos_count: productos[0].count } });
@@ -73,6 +76,7 @@ export const getCategoriaById = async (req, res) => {
 export const createCategoria = async (req, res) => {
   try {
     const { nombre, descripcion, parent_id } = req.body;
+    const empresaId = getEmpresaId(req);
 
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es obligatorio' });
@@ -80,8 +84,8 @@ export const createCategoria = async (req, res) => {
 
     // Verificar si ya existe
     const existing = await getOne(
-      'SELECT id FROM categorias WHERE nombre = ?',
-      [nombre]
+      'SELECT id FROM categorias WHERE empresa_id = ? AND nombre = ?',
+      [empresaId, nombre]
     );
 
     if (existing) {
@@ -89,8 +93,8 @@ export const createCategoria = async (req, res) => {
     }
 
     const result = await runQuery(
-      'INSERT INTO categorias (nombre, descripcion, parent_id, activa) VALUES (?, ?, ?, 1)',
-      [nombre, descripcion, parent_id || null]
+      'INSERT INTO categorias (nombre, descripcion, parent_id, activa, empresa_id) VALUES (?, ?, ?, 1, ?)',
+      [nombre, descripcion, parent_id || null, empresaId]
     );
 
     res.status(201).json({
@@ -108,8 +112,9 @@ export const updateCategoria = async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre, descripcion, parent_id, activa } = req.body;
+    const empresaId = getEmpresaId(req);
 
-    const categoria = await getOne('SELECT id FROM categorias WHERE id = ?', [id]);
+    const categoria = await getOne('SELECT id FROM categorias WHERE empresa_id = ? AND id = ?', [empresaId, id]);
     if (!categoria) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
@@ -117,8 +122,8 @@ export const updateCategoria = async (req, res) => {
     // Verificar nombre duplicado
     if (nombre) {
       const existing = await getOne(
-        'SELECT id FROM categorias WHERE nombre = ? AND id != ?',
-        [nombre, id]
+        'SELECT id FROM categorias WHERE empresa_id = ? AND nombre = ? AND id != ?',
+        [empresaId, nombre, id]
       );
 
       if (existing) {
@@ -127,8 +132,8 @@ export const updateCategoria = async (req, res) => {
     }
 
     await runQuery(
-      'UPDATE categorias SET nombre = ?, descripcion = ?, parent_id = ?, activa = ? WHERE id = ?',
-      [nombre, descripcion, parent_id || null, activa !== undefined ? activa : 1, id]
+      'UPDATE categorias SET nombre = ?, descripcion = ?, parent_id = ?, activa = ? WHERE empresa_id = ? AND id = ?',
+      [nombre, descripcion, parent_id || null, activa !== undefined ? activa : 1, empresaId, id]
     );
 
     res.json({ message: 'Categoría actualizada exitosamente' });
@@ -142,16 +147,17 @@ export const updateCategoria = async (req, res) => {
 export const deleteCategoria = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    const categoria = await getOne('SELECT id FROM categorias WHERE id = ?', [id]);
+    const categoria = await getOne('SELECT id FROM categorias WHERE empresa_id = ? AND id = ?', [empresaId, id]);
     if (!categoria) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
 
     // Verificar si tiene productos
     const productos = await getOne(
-      'SELECT COUNT(*) as count FROM productos WHERE categoria_id = ?',
-      [id]
+      'SELECT COUNT(*) as count FROM productos WHERE empresa_id = ? AND categoria_id = ?',
+      [empresaId, id]
     );
 
     if (productos.count > 0) {
@@ -162,8 +168,8 @@ export const deleteCategoria = async (req, res) => {
 
     // Verificar si tiene subcategorías
     const subcategorias = await getOne(
-      'SELECT COUNT(*) as count FROM categorias WHERE parent_id = ?',
-      [id]
+      'SELECT COUNT(*) as count FROM categorias WHERE empresa_id = ? AND parent_id = ?',
+      [empresaId, id]
     );
 
     if (subcategorias.count > 0) {
@@ -172,7 +178,7 @@ export const deleteCategoria = async (req, res) => {
       });
     }
 
-    await runQuery('UPDATE categorias SET activa = 0 WHERE id = ?', [id]);
+    await runQuery('UPDATE categorias SET activa = 0 WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     res.json({ message: 'Categoría eliminada exitosamente' });
   } catch (error) {

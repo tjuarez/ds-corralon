@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { cuentaCorrienteApi } from '../api/cuentaCorriente';
@@ -42,7 +43,7 @@ const EstadoCuenta = () => {
       setData(result);
     } catch (error) {
       showError(error.message);
-      navigate('/cuenta-corriente');
+      navigate(buildTenantPath('/cuenta-corriente'));
     } finally {
       setLoading(false);
     }
@@ -93,7 +94,7 @@ const EstadoCuenta = () => {
           <p style={styles.subtitle}>{cliente.razon_social}</p>
         </div>
         <div style={styles.headerActions}>
-          <button onClick={() => navigate('/cuenta-corriente')} style={styles.backButton}>
+          <button onClick={() => navigate(buildTenantPath('/cuenta-corriente'))} style={styles.backButton}>
             <ArrowLeft size={18} style={{ marginRight: '6px' }} />
             Volver
           </button>
@@ -102,7 +103,7 @@ const EstadoCuenta = () => {
             Imprimir
           </button>
           <button
-            onClick={() => navigate(`/cuenta-corriente/${clienteId}/pago`)}
+            onClick={() => navigate(buildTenantPath(`/cuenta-corriente/${clienteId}/pago`))}
             style={styles.addButton}
           >
             <Plus size={18} style={{ marginRight: '6px' }} />

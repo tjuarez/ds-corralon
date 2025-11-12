@@ -7,32 +7,19 @@ import { getOne } from '../db/database.js';
 export const tenantMiddleware = async (req, res, next) => {
   try {
     // Rutas que no requieren tenant (login público, registro, etc.)
-    const rutasPublicas = ['/api/auth/login', '/api/auth/register', '/api/health'];
-    
-    if (rutasPublicas.includes(req.path)) {
+    // Cualquier ruta que comience con /api/auth/ es pública
+    if (req.path.startsWith('/auth/') || req.path === '/health') {
       return next();
     }
 
-    // Extraer tenant del path: /api/tenant/dashboard -> tenant
-    const pathParts = req.path.split('/').filter(p => p);
-    
-    // Buscar el índice de 'api' y el siguiente elemento será el tenant
-    const apiIndex = pathParts.indexOf('api');
-    if (apiIndex === -1 || apiIndex === pathParts.length - 1) {
-      // Si no hay 'api' o no hay nada después, no hay tenant en la URL
+    // Extraer tenant del path de Express (ya viene en req.params.tenant)
+    const tenantSlug = req.params.tenant;
+
+    if (!tenantSlug) {
       return res.status(400).json({ 
         error: 'URL inválida. Se requiere especificar una empresa.',
         hint: 'Formato correcto: /api/:tenant/recurso'
       });
-    }
-
-    const tenantSlug = pathParts[apiIndex + 1];
-
-    // Validar que el slug no sea un recurso directo (para rutas especiales)
-    const recursosDirectos = ['empresas', 'super-admin'];
-    if (recursosDirectos.includes(tenantSlug)) {
-      // Estas rutas las manejaremos después para el super-admin
-      return next();
     }
 
     // Buscar empresa por slug

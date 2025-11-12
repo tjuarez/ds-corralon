@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -122,7 +123,7 @@ const VentaForm = () => {
       }
     } catch (error) {
       showError(error.message);
-      navigate('/ventas');
+      navigate(buildTenantPath('/ventas'));
     } finally {
       setLoadingPresupuesto(false);
     }
@@ -357,7 +358,7 @@ const VentaForm = () => {
 
       const result = await ventasApi.create(dataToSend);
       showSuccess(`Venta ${result.numero_comprobante} creada exitosamente`);
-      navigate('/ventas');
+      navigate(buildTenantPath('/ventas'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -397,7 +398,7 @@ const VentaForm = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/ventas')}
+          onClick={() => navigate(buildTenantPath('/ventas'))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -919,7 +920,7 @@ const VentaForm = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate('/ventas')}
+            onClick={() => navigate(buildTenantPath('/ventas'))}
             style={styles.cancelButton}
             disabled={loading}
           >

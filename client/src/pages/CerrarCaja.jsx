@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -36,7 +37,7 @@ const CerrarCaja = () => {
       
       if (cajaData.caja.estado !== 'abierta') {
         showError('La caja ya está cerrada');
-        navigate('/caja');
+        navigate(buildTenantPath('/caja'));
         return;
       }
       
@@ -49,7 +50,7 @@ const CerrarCaja = () => {
       }));
     } catch (error) {
       showError(error.message);
-      navigate('/caja');
+      navigate(buildTenantPath('/caja'));
     }
   };
 
@@ -106,7 +107,7 @@ const CerrarCaja = () => {
         showSuccess(`Caja cerrada. Diferencia: $${result.diferencia.toFixed(2)}`);
       }
       
-      navigate('/caja');
+      navigate(buildTenantPath('/caja'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -136,7 +137,7 @@ const CerrarCaja = () => {
           <p style={styles.subtitle}>Realizar el arqueo y cierre de caja</p>
         </div>
         <button
-          onClick={() => navigate(`/caja/${id}`)}
+          onClick={() => navigate(buildTenantPath(`/caja/${id}`))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -297,7 +298,7 @@ const CerrarCaja = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate(`/caja/${id}`)}
+            onClick={() => navigate(buildTenantPath(`/caja/${id}`))}
             style={styles.cancelButton}
             disabled={loading}
           >

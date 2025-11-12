@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { presupuestosApi } from '../api/presupuestos';
@@ -87,7 +88,7 @@ const Presupuestos = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/presupuestos/nuevo')}
+          onClick={() => navigate(buildTenantPath('/presupuestos/nuevo'))}
           style={styles.addButton}
         >
           <Plus size={18} style={{ marginRight: '6px' }} />
@@ -132,7 +133,7 @@ const Presupuestos = () => {
           <FileText size={48} color="#9ca3af" />
           <p style={styles.noDataText}>{t('noData')}</p>
           <button
-            onClick={() => navigate('/presupuestos/nuevo')}
+            onClick={() => navigate(buildTenantPath('/presupuestos/nuevo'))}
             style={styles.addButtonSecondary}
           >
             Crear primer presupuesto
@@ -198,7 +199,7 @@ const Presupuestos = () => {
 
               <div style={styles.cardFooter}>
                 <button
-                  onClick={() => navigate(`/presupuestos/${presupuesto.id}`)}
+                  onClick={() => navigate(buildTenantPath(`/presupuestos/${presupuesto.id}`))}
                   style={styles.viewButton}
                 >
                   <Eye size={16} style={{ marginRight: '6px' }} />
@@ -206,7 +207,7 @@ const Presupuestos = () => {
                 </button>
                 {presupuesto.estado !== 'convertido' && (
                   <button
-                    onClick={() => navigate(`/presupuestos/${presupuesto.id}/editar`)}
+                    onClick={() => navigate(buildTenantPath(`/presupuestos/${presupuesto.id}/editar`))}
                     style={styles.editButton}
                   >
                     <Edit size={16} style={{ marginRight: '6px' }} />

@@ -4,6 +4,7 @@ import { configuracionApi } from '../api/configuracion';
 import Layout from '../components/Layout';
 import { Building2, FileText, DollarSign, Save, RefreshCw } from 'lucide-react';
 import { countries, getProvincesByCountry, getCitiesByProvince } from '../utils/locations';
+import { fetchWithTenant } from '../utils/fetchWithTenant';
 
 const Configuracion = () => {
   const { showSuccess, showError } = useNotification();
@@ -164,7 +165,7 @@ const handleLogoFileChange = async (e) => {
       const formData = new FormData();
       formData.append('imagen', file);
 
-      const response = await fetch('/api/upload/producto-imagen', {
+      const response = await fetchWithTenant('/api/upload/producto-imagen', {
         method: 'POST',
         credentials: 'include',
         body: formData,
@@ -179,7 +180,7 @@ const handleLogoFileChange = async (e) => {
       console.log('✅ Respuesta del servidor:', data);
       console.log('🖼️ URL de la imagen:', data.imageUrl);
       
-      // Actualizar el logo_url en empresa (CORREGIDO)
+      // Actualizar el logo_url en empresa
       const nuevoEstado = { ...empresa, logo_url: data.imageUrl };
       setEmpresa(nuevoEstado);
       setLogoPreview(data.imageUrl);

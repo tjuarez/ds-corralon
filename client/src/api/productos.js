@@ -1,4 +1,4 @@
-import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+import { fetchWithTenant } from '../utils/fetchWithTenant';
 
 const API_URL = '/api';
 
@@ -6,7 +6,7 @@ export const productosApi = {
   // Productos
   getAll: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await fetchWithSucursal(`${API_URL}/productos?${params}`, {
+    const response = await fetchWithTenant(`${API_URL}/productos?${params}`, {
       credentials: 'include',
     });
 
@@ -19,7 +19,7 @@ export const productosApi = {
   },
 
   getById: async (id) => {
-    const response = await fetchWithSucursal(`${API_URL}/productos/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/productos/${id}`, {
       credentials: 'include',
     });
 
@@ -32,7 +32,7 @@ export const productosApi = {
   },
 
   create: async (productoData) => {
-    const response = await fetchWithSucursal(`${API_URL}/productos`, {
+    const response = await fetchWithTenant(`${API_URL}/productos`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -50,7 +50,7 @@ export const productosApi = {
   },
 
   update: async (id, productoData) => {
-    const response = await fetchWithSucursal(`${API_URL}/productos/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/productos/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -68,7 +68,7 @@ export const productosApi = {
   },
 
   delete: async (id) => {
-    const response = await fetchWithSucursal(`${API_URL}/productos/${id}`, {
+    const response = await fetchWithTenant(`${API_URL}/productos/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -82,7 +82,7 @@ export const productosApi = {
   },
 
   updatePrecios: async (id, precios) => {
-    const response = await fetchWithSucursal(`${API_URL}/productos/${id}/precios`, {
+    const response = await fetchWithTenant(`${API_URL}/productos/${id}/precios`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -101,7 +101,7 @@ export const productosApi = {
 
   // Categorías
   getCategorias: async () => {
-    const response = await fetchWithSucursal(`${API_URL}/categorias`, {
+    const response = await fetchWithTenant(`${API_URL}/categorias`, {
       credentials: 'include',
     });
 
@@ -114,7 +114,7 @@ export const productosApi = {
   },
 
   createCategoria: async (categoriaData) => {
-    const response = await fetchWithSucursal(`${API_URL}/categorias`, {
+    const response = await fetchWithTenant(`${API_URL}/categorias`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -136,7 +136,7 @@ export const productosApi = {
     const formData = new FormData();
     formData.append('imagen', file);
 
-    const response = await fetchWithSucursal(`${API_URL}/upload/producto-imagen`, {
+    const response = await fetchWithTenant(`${API_URL}/upload/producto-imagen`, {
       method: 'POST',
       credentials: 'include',
       body: formData,
@@ -152,7 +152,7 @@ export const productosApi = {
 
   // Eliminar imagen
   deleteImagen: async (filename) => {
-    const response = await fetchWithSucursal(`${API_URL}/upload/producto-imagen/${filename}`, {
+    const response = await fetchWithTenant(`${API_URL}/upload/producto-imagen/${filename}`, {
       method: 'DELETE',
       credentials: 'include',
     });

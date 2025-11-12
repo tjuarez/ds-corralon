@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -46,7 +47,7 @@ const CajaDetalle = () => {
       setResumen(resumenData);
     } catch (error) {
       showError(error.message);
-      navigate('/caja');
+      navigate(buildTenantPath('/caja'));
     } finally {
       setLoading(false);
     }
@@ -87,7 +88,7 @@ const CajaDetalle = () => {
           </p>
         </div>
         <div style={styles.headerActions}>
-          <button onClick={() => navigate('/caja')} style={styles.backButton}>
+          <button onClick={() => navigate(buildTenantPath('/caja'))} style={styles.backButton}>
             <ArrowLeft size={18} style={{ marginRight: '6px' }} />
             Volver
           </button>
@@ -98,14 +99,14 @@ const CajaDetalle = () => {
           {caja.estado === 'abierta' && (
             <>
               <button
-                onClick={() => navigate(`/caja/${id}/movimiento`)}
+                onClick={() => navigate(buildTenantPath(`/caja/${id}/movimiento`))}
                 style={styles.addButton}
               >
                 <Plus size={18} style={{ marginRight: '6px' }} />
                 Nuevo Movimiento
               </button>
               <button
-                onClick={() => navigate(`/caja/${id}/cerrar`)}
+                onClick={() => navigate(buildTenantPath(`/caja/${id}/cerrar`))}
                 style={styles.cerrarButton}
               >
                 Cerrar Caja

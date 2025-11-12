@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { productosApi } from '../api/productos';
@@ -178,7 +179,7 @@ const ProductoForm = () => {
       }
     } catch (error) {
       showError(error.message);
-      navigate('/productos');
+      navigate(buildTenantPath('/productos'));
     } finally {
       setLoadingData(false);
     }
@@ -343,7 +344,7 @@ const ProductoForm = () => {
         showSuccess('Producto creado exitosamente');
       }
 
-      navigate('/productos');
+      navigate(buildTenantPath('/productos'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -387,7 +388,7 @@ const ProductoForm = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/productos')}
+          onClick={() => navigate(buildTenantPath('/productos'))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -805,7 +806,7 @@ const ProductoForm = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate('/productos')}
+            onClick={() => navigate(buildTenantPath('/productos'))}
             style={styles.cancelButton}
             disabled={loading}
           >

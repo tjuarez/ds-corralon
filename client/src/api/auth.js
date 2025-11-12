@@ -1,16 +1,16 @@
-import { fetchWithSucursal } from '../utils/fetchWithSucursal';
+import { fetchWithTenant } from '../utils/fetchWithTenant';
 
 const API_URL = '/api';
 
 export const authApi = {
-  login: async (username, password) => {
-    const response = await fetchWithSucursal(`${API_URL}/auth/login`, {
+  login: async (tenant, username, password) => {
+    const response = await fetchWithTenant(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ tenant, username, password }),
     });
 
     if (!response.ok) {
@@ -22,7 +22,7 @@ export const authApi = {
   },
 
   register: async (userData) => {
-    const response = await fetchWithSucursal(`${API_URL}/auth/register`, {
+    const response = await fetchWithTenant(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -40,7 +40,7 @@ export const authApi = {
   },
 
   logout: async () => {
-    const response = await fetchWithSucursal(`${API_URL}/auth/logout`, {
+    const response = await fetchWithTenant(`${API_URL}/auth/logout`, {
       method: 'POST',
       credentials: 'include',
     });
@@ -53,7 +53,7 @@ export const authApi = {
   },
 
   getCurrentUser: async () => {
-    const response = await fetchWithSucursal(`${API_URL}/auth/me`, {
+    const response = await fetchWithTenant(`${API_URL}/auth/me`, {
       credentials: 'include',
     });
 
@@ -65,7 +65,7 @@ export const authApi = {
   },
 
   changePassword: async (currentPassword, newPassword) => {
-    const response = await fetchWithSucursal(`${API_URL}/auth/change-password`, {
+    const response = await fetchWithTenant(`${API_URL}/auth/change-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

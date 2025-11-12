@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -110,7 +111,7 @@ const Caja = () => {
         </div>
         {!cajaAbierta && (
           <button
-            onClick={() => navigate('/caja/abrir')}
+            onClick={() => navigate(buildTenantPath('/caja/abrir'))}
             style={styles.addButton}
           >
             <Plus size={18} style={{ marginRight: '6px' }} />
@@ -181,14 +182,14 @@ const Caja = () => {
 
           <div style={styles.cajaActivaActions}>
             <button
-              onClick={() => navigate(`/caja/${cajaAbierta.id}`)}
+              onClick={() => navigate(buildTenantPath(`/caja/${cajaAbierta.id}`))}
               style={styles.verCajaButton}
             >
               <Eye size={16} style={{ marginRight: '6px' }} />
               Ver Movimientos
             </button>
             <button
-              onClick={() => navigate(`/caja/${cajaAbierta.id}/cerrar`)}
+              onClick={() => navigate(buildTenantPath(`/caja/${cajaAbierta.id}/cerrar`))}
               style={styles.cerrarButton}
             >
               <CheckCircle size={16} style={{ marginRight: '6px' }} />
@@ -307,7 +308,7 @@ const Caja = () => {
 
                 <div style={styles.cardFooter}>
                   <button
-                    onClick={() => navigate(`/caja/${caja.id}`)}
+                    onClick={() => navigate(buildTenantPath(`/caja/${caja.id}`))}
                     style={styles.viewButton}
                   >
                     <Eye size={16} style={{ marginRight: '6px' }} />

@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { getTenantFromUrl, buildTenantPath } from '../utils/tenantHelper';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { tenant: urlTenant } = useParams();
   const { login } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   
@@ -14,6 +16,36 @@ const Login = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Validar que el tenant en la URL exista
+  useEffect(() => {
+    const checkTenant = async () => {
+      const tenant = urlTenant || getTenantFromUrl();
+      
+      if (!tenant || tenant === '') {
+        navigate('/demo/login', { replace: true });
+        return;
+      }
+
+      // Opcional: Validar que el tenant exista en el backend
+      try {
+        const response = await fetch('/api/auth/empresas');
+        const data = await response.json();
+        const empresas = data.empresas || [];
+        
+        if (!empresas.some(e => e.slug === tenant)) {
+          setError('Empresa no encontrada. Redirigiendo a Demo...');
+          setTimeout(() => {
+            navigate('/demo/login', { replace: true });
+          }, 2000);
+        }
+      } catch (err) {
+        console.error('Error verificando tenant:', err);
+      }
+    };
+
+    checkTenant();
+  }, [urlTenant, navigate]);
 
   const handleChange = (e) => {
     setFormData({
@@ -29,8 +61,9 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await login(formData.username, formData.password);
-      navigate('/dashboard');
+      const tenant = urlTenant || getTenantFromUrl();
+      await login(tenant, formData.username, formData.password);
+      navigate(buildTenantPath('/dashboard'));
     } catch (err) {
       setError(err.message || t('loginError'));
     } finally {
@@ -41,6 +74,8 @@ const Login = () => {
   const handleLanguageChange = (e) => {
     setLanguage(e.target.value);
   };
+
+  const currentTenant = urlTenant || getTenantFromUrl();
 
   return (
     <div style={styles.container}>
@@ -60,6 +95,9 @@ const Login = () => {
         <div style={styles.header}>
           <h1 style={styles.title}>{t('appName')}</h1>
           <p style={styles.subtitle}>{t('appDescription')}</p>
+          <div style={styles.tenantBadge}>
+            Empresa: <strong>{currentTenant}</strong>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
@@ -104,21 +142,15 @@ const Login = () => {
           >
             {loading ? t('loading') : t('login')}
           </button>
-
-          <div style={styles.footer}>
-            <p style={styles.footerText}>
-              {t('dontHaveAccount')}{' '}
-              <Link to="/register" style={styles.link}>
-                {t('register')}
-              </Link>
-            </p>
-          </div>
         </form>
 
         <div style={styles.infoBox}>
-          <p style={styles.infoTitle}>Usuario de prueba:</p>
+          <p style={styles.infoTitle}>Usuario de prueba (empresa: demo):</p>
           <p style={styles.infoText}>Usuario: <strong>admin</strong></p>
           <p style={styles.infoText}>Contraseña: <strong>admin123</strong></p>
+          <p style={styles.infoHint}>
+            💡 Accede en: <strong>localhost:5173/demo/login</strong>
+          </p>
         </div>
       </div>
     </div>
@@ -176,7 +208,17 @@ const styles = {
   subtitle: {
     fontSize: '14px',
     color: '#6b7280',
-    margin: 0,
+    margin: '0 0 12px 0',
+  },
+  tenantBadge: {
+    display: 'inline-block',
+    padding: '8px 16px',
+    backgroundColor: '#dbeafe',
+    color: '#1e40af',
+    borderRadius: '20px',
+    fontSize: '13px',
+    fontWeight: '500',
+    border: '2px solid #bfdbfe',
   },
   form: {
     display: 'flex',
@@ -231,20 +273,6 @@ const styles = {
     textAlign: 'center',
     border: '1px solid #fecaca',
   },
-  footer: {
-    textAlign: 'center',
-    marginTop: '10px',
-  },
-  footerText: {
-    fontSize: '14px',
-    color: '#6b7280',
-    margin: 0,
-  },
-  link: {
-    color: '#2563eb',
-    textDecoration: 'none',
-    fontWeight: '600',
-  },
   infoBox: {
     marginTop: '25px',
     padding: '18px',
@@ -262,6 +290,12 @@ const styles = {
     fontSize: '13px',
     color: '#1e40af',
     margin: '5px 0',
+  },
+  infoHint: {
+    fontSize: '12px',
+    color: '#1e40af',
+    margin: '10px 0 0 0',
+    fontStyle: 'italic',
   },
 };
 

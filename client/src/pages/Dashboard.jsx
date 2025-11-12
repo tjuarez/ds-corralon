@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { reportesApi } from '../api/reportes';
@@ -84,7 +85,7 @@ const Dashboard = () => {
 
       {/* Métricas Principales */}
       <div style={styles.metricsGrid}>
-        <div style={styles.metricCard} onClick={() => navigate('/ventas')}>
+        <div style={styles.metricCard} onClick={() => navigate(buildTenantPath('/ventas'))}>
           <div style={{ ...styles.metricIcon, backgroundColor: '#dbeafe' }}>
             <TrendingUp size={28} color="#2563eb" />
           </div>
@@ -99,7 +100,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.metricCard} onClick={() => navigate('/ventas')}>
+        <div style={styles.metricCard} onClick={() => navigate(buildTenantPath('/ventas'))}>
           <div style={{ ...styles.metricIcon, backgroundColor: '#d1fae5' }}>
             <DollarSign size={28} color="#10b981" />
           </div>
@@ -114,7 +115,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.metricCard} onClick={() => navigate('/productos')}>
+        <div style={styles.metricCard} onClick={() => navigate(buildTenantPath('/productos'))}>
           <div style={{ ...styles.metricIcon, backgroundColor: '#fee2e2' }}>
             <AlertCircle size={28} color="#dc2626" />
           </div>
@@ -125,7 +126,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.metricCard} onClick={() => navigate('/cuenta-corriente')}>
+        <div style={styles.metricCard} onClick={() => navigate(buildTenantPath('/cuenta-corriente'))}>
           <div style={{ ...styles.metricIcon, backgroundColor: '#fef3c7' }}>
             <Wallet size={28} color="#f59e0b" />
           </div>
@@ -140,7 +141,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.metricCard} onClick={() => navigate('/caja')}>
+        <div style={styles.metricCard} onClick={() => navigate(buildTenantPath('/caja'))}>
           <div style={{ ...styles.metricIcon, backgroundColor: '#e0e7ff' }}>
             <Package size={28} color="#6366f1" />
           </div>
@@ -155,7 +156,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.metricCard} onClick={() => navigate('/presupuestos')}>
+        <div style={styles.metricCard} onClick={() => navigate(buildTenantPath('/presupuestos'))}>
           <div style={{ ...styles.metricIcon, backgroundColor: '#fce7f3' }}>
             <FileText size={28} color="#ec4899" />
           </div>
@@ -204,7 +205,7 @@ const Dashboard = () => {
           <div style={styles.sectionHeader}>
             <h2 style={styles.sectionTitle}>{t('topProducts')}</h2>
             <button
-              onClick={() => navigate('/reportes/productos')}
+              onClick={() => navigate(buildTenantPath('/reportes/productos'))}
               style={styles.viewAllButton}
             >
               {t('viewReport')}
@@ -254,7 +255,7 @@ const Dashboard = () => {
           <div style={styles.sectionHeader}>
             <h2 style={styles.sectionTitle}>{t('topClients')}</h2>
             <button
-              onClick={() => navigate('/reportes/clientes')}
+              onClick={() => navigate(buildTenantPath('/reportes/clientes'))}
               style={styles.viewAllButton}
             >
               {t('viewReport')}
@@ -302,7 +303,7 @@ const Dashboard = () => {
         <h2 style={styles.sectionTitle}>{t('reports')}</h2>
         <div style={styles.reportsGrid}>
           <button
-            onClick={() => navigate('/reportes/ventas')}
+            onClick={() => navigate(buildTenantPath('/reportes/ventas'))}
             style={styles.reportButton}
           >
             <TrendingUp size={24} color="#2563eb" />
@@ -311,7 +312,7 @@ const Dashboard = () => {
           </button>
 
           <button
-            onClick={() => navigate('/reportes/productos')}
+            onClick={() => navigate(buildTenantPath('/reportes/productos'))}
             style={styles.reportButton}
           >
             <Package size={24} color="#10b981" />
@@ -320,7 +321,7 @@ const Dashboard = () => {
           </button>
 
           <button
-            onClick={() => navigate('/reportes/clientes')}
+            onClick={() => navigate(buildTenantPath('/reportes/clientes'))}
             style={styles.reportButton}
           >
             <Users size={24} color="#f59e0b" />
@@ -329,7 +330,7 @@ const Dashboard = () => {
           </button>
 
           <button
-            onClick={() => navigate('/reportes/stock')}
+            onClick={() => navigate(buildTenantPath('/reportes/stock'))}
             style={styles.reportButton}
           >
             <AlertCircle size={24} color="#dc2626" />
@@ -338,7 +339,7 @@ const Dashboard = () => {
           </button>
 
           <button
-            onClick={() => navigate('/reportes/caja')}
+            onClick={() => navigate(buildTenantPath('/reportes/caja'))}
             style={styles.reportButton}
           >
             <DollarSign size={24} color="#6366f1" />
@@ -347,7 +348,7 @@ const Dashboard = () => {
           </button>
 
           <button
-            onClick={() => navigate('/reportes/rentabilidad')}
+            onClick={() => navigate(buildTenantPath('/reportes/rentabilidad'))}
             style={styles.reportButton}
           >
             <BarChart3 size={24} color="#ec4899" />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { proveedoresApi } from '../api/proveedores';
@@ -61,7 +62,7 @@ const Proveedores = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/proveedores/nuevo')}
+          onClick={() => navigate(buildTenantPath('/proveedores/nuevo'))}
           style={styles.addButton}
         >
           <Plus size={18} style={{ marginRight: '6px' }} />
@@ -94,7 +95,7 @@ const Proveedores = () => {
           <Package size={48} color="#9ca3af" />
           <p style={styles.noDataText}>{t('noData')}</p>
           <button
-            onClick={() => navigate('/proveedores/nuevo')}
+            onClick={() => navigate(buildTenantPath('/proveedores/nuevo'))}
             style={styles.addButtonSecondary}
           >
             Crear primer proveedor
@@ -168,14 +169,14 @@ const Proveedores = () => {
 
               <div style={styles.cardFooter}>
                 <button
-                  onClick={() => navigate(`/proveedores/${proveedor.id}`)}
+                  onClick={() => navigate(buildTenantPath(`/proveedores/${proveedor.id}`))}
                   style={styles.viewButton}
                 >
                   <Eye size={16} style={{ marginRight: '6px' }} />
                   Ver
                 </button>
                 <button
-                  onClick={() => navigate(`/proveedores/${proveedor.id}/editar`)}
+                  onClick={() => navigate(buildTenantPath(`/proveedores/${proveedor.id}/editar`))}
                   style={styles.editButton}
                 >
                   <Edit size={16} style={{ marginRight: '6px' }} />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { sucursalesApi } from '../api/sucursales';
@@ -110,7 +111,7 @@ const SucursalForm = () => {
       }
     } catch (error) {
       showError(error.message);
-      navigate('/sucursales');
+      navigate(buildTenantPath('/sucursales'));
     } finally {
       setLoading(false);
     }
@@ -142,7 +143,7 @@ const SucursalForm = () => {
         await sucursalesApi.create(formData);
         showSuccess('Sucursal creada exitosamente');
       }
-      navigate('/sucursales');
+      navigate(buildTenantPath('/sucursales'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -173,7 +174,7 @@ const SucursalForm = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/sucursales')}
+          onClick={() => navigate(buildTenantPath('/sucursales'))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -354,7 +355,7 @@ const SucursalForm = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate('/sucursales')}
+            onClick={() => navigate(buildTenantPath('/sucursales'))}
             style={styles.cancelButton}
             disabled={loading}
           >

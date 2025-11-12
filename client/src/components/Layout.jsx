@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import SucursalSelector from './SucursalSelector';
+import { buildTenantPath } from '../utils/tenantHelper';
+import { fetchWithTenant } from '../utils/fetchWithTenant';
 import {
   LayoutDashboard,
   Users,
@@ -38,7 +40,7 @@ const Layout = ({ children }) => {
 
   const loadLogo = async () => {
     try {
-      const response = await fetch('/api/configuracion/empresa_logo_url', {
+      const response = await fetchWithTenant('/api/configuracion/empresa_logo_url', {
         credentials: 'include',
       });
       
@@ -55,46 +57,46 @@ const Layout = ({ children }) => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate(buildTenantPath('/login'));
   };
 
   const handleLanguageChange = (e) => {
     setLanguage(e.target.value);
   };
 
-  const menuItems = [
-    { path: '/dashboard', icon: BarChart3, label: t('dashboard') },
-    { path: '/clientes', icon: Users, label: t('clients') },
-    { path: '/productos', icon: Package, label: t('products') },
-    { path: '/movimientos-stock', icon: TrendingUp, label: t('stockMovements') },
-    { path: '/proveedores', icon: Truck, label: t('providers') },
-    { path: '/ventas', icon: ShoppingCart, label: t('sales') },
-    { path: '/presupuestos', icon: FileText, label: t('quotes') },
-    { path: '/compras', icon: ShoppingBag, label: t('purchases') }
+const menuItems = [
+    { path: buildTenantPath('/dashboard'), icon: BarChart3, label: t('dashboard') },
+    { path: buildTenantPath('/clientes'), icon: Users, label: t('clients') },
+    { path: buildTenantPath('/productos'), icon: Package, label: t('products') },
+    { path: buildTenantPath('/movimientos-stock'), icon: TrendingUp, label: t('stockMovements') },
+    { path: buildTenantPath('/proveedores'), icon: Truck, label: t('providers') },
+    { path: buildTenantPath('/ventas'), icon: ShoppingCart, label: t('sales') },
+    { path: buildTenantPath('/presupuestos'), icon: FileText, label: t('quotes') },
+    { path: buildTenantPath('/compras'), icon: ShoppingBag, label: t('purchases') }
   ];
 
   if (user?.rol === 'admin' || user?.rol === 'vendedor' || user?.rol === 'cajero') {
     menuItems.push(
-      { path: '/cuenta-corriente', icon: DollarSign, label: t('currentAccount') }
+      { path: buildTenantPath('/cuenta-corriente'), icon: DollarSign, label: t('currentAccount') }
     );
   }
 
   if (user?.rol === 'admin' || user?.rol === 'cajero') {
     menuItems.push(
-      { path: '/caja', icon: DollarSign, label: t('cashRegister') }
+      { path: buildTenantPath('/caja'), icon: DollarSign, label: t('cashRegister') }
     );
   }
 
   menuItems.push(
-    { path: '/reportes', icon: BarChart3, label: t('reports') }
+    { path: buildTenantPath('/reportes'), icon: BarChart3, label: t('reports') }
   );
 
   // Solo admins pueden ver configuración y usuarios
   if (user?.rol === 'admin') {
     menuItems.push(
-      { path: '/sucursales', icon: Building2, label: t('branches') },
-      { path: '/usuarios', icon: User, label: t('users') },
-      { path: '/configuracion', icon: Settings, label: t('settings') }
+      { path: buildTenantPath('/sucursales'), icon: Building2, label: t('branches') },
+      { path: buildTenantPath('/usuarios'), icon: User, label: t('users') },
+      { path: buildTenantPath('/configuracion'), icon: Settings, label: t('settings') }
     );
   }
 

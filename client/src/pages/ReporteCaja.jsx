@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { reportesApi } from '../api/reportes';
@@ -78,7 +79,7 @@ const ReporteCaja = () => {
           <h1 style={styles.title}>{t('cashReport')}</h1>
           <p style={styles.subtitle}>Análisis de movimientos de caja</p>
         </div>
-        <button onClick={() => navigate('/dashboard')} style={styles.backButton}>
+        <button onClick={() => navigate(buildTenantPath('/dashboard'))} style={styles.backButton}>
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
           {t('back')}
         </button>
@@ -223,7 +224,7 @@ const ReporteCaja = () => {
                         <tr 
                           key={caja.id} 
                           style={styles.tr}
-                          onClick={() => navigate(`/caja/${caja.id}`)}
+                          onClick={() => navigate(buildTenantPath(`/caja/${caja.id}`))}
                         >
                           <td style={styles.td}>
                             <span style={styles.cajaNumero}>#{caja.numero}</span>

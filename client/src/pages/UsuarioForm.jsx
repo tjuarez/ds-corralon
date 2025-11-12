@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { usuariosApi } from '../api/usuarios';
@@ -59,7 +60,7 @@ const UsuarioForm = () => {
       });
     } catch (error) {
       showError(error.message);
-      navigate('/usuarios');
+      navigate(buildTenantPath('/usuarios'));
     } finally {
       setLoading(false);
     }
@@ -117,7 +118,7 @@ const UsuarioForm = () => {
         await usuariosApi.create(dataToSend);
         showSuccess('Usuario creado exitosamente');
       }
-      navigate('/usuarios');
+      navigate(buildTenantPath('/usuarios'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -148,7 +149,7 @@ const UsuarioForm = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/usuarios')}
+          onClick={() => navigate(buildTenantPath('/usuarios'))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -316,7 +317,7 @@ const UsuarioForm = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate('/usuarios')}
+            onClick={() => navigate(buildTenantPath('/usuarios'))}
             style={styles.cancelButton}
             disabled={loading}
           >

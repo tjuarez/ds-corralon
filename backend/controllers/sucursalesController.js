@@ -1,12 +1,14 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todas las sucursales
 export const getSucursales = async (req, res) => {
   try {
     const { activa } = req.query;
+    const empresaId = getEmpresaId(req);
 
-    let sql = 'SELECT * FROM sucursales WHERE 1=1';
-    const params = [];
+    let sql = 'SELECT * FROM sucursales WHERE empresa_id = ?';
+    const params = [empresaId];
 
     if (activa !== undefined) {
       sql += ' AND activa = ?';
@@ -27,8 +29,9 @@ export const getSucursales = async (req, res) => {
 export const getSucursalById = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    const sucursal = await getOne('SELECT * FROM sucursales WHERE id = ?', [id]);
+    const sucursal = await getOne('SELECT * FROM sucursales WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     if (!sucursal) {
       return res.status(404).json({ error: 'Sucursal no encontrada' });
@@ -56,6 +59,7 @@ export const createSucursal = async (req, res) => {
       email,
       responsable,
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Validaciones
     if (!codigo || !nombre) {
@@ -66,8 +70,8 @@ export const createSucursal = async (req, res) => {
 
     // Verificar que el código no exista
     const existente = await getOne(
-      'SELECT id FROM sucursales WHERE codigo = ?',
-      [codigo]
+      'SELECT id FROM sucursales WHERE empresa_id = ? AND codigo = ?',
+      [empresaId, codigo]
     );
 
     if (existente) {
@@ -80,11 +84,11 @@ export const createSucursal = async (req, res) => {
     const result = await runQuery(`
       INSERT INTO sucursales (
         codigo, nombre, direccion, pais, provincia, ciudad,
-        codigo_postal, telefono, email, responsable
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        codigo_postal, telefono, email, responsable, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       codigo, nombre, direccion, pais, provincia, ciudad,
-      codigo_postal, telefono, email, responsable
+      codigo_postal, telefono, email, responsable, empresaId
     ]);
 
     res.status(201).json({
@@ -113,9 +117,10 @@ export const updateSucursal = async (req, res) => {
       email,
       responsable,
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Verificar que existe
-    const sucursal = await getOne('SELECT id FROM sucursales WHERE id = ?', [id]);
+    const sucursal = await getOne('SELECT id FROM sucursales WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     if (!sucursal) {
       return res.status(404).json({ error: 'Sucursal no encontrada' });
@@ -130,8 +135,8 @@ export const updateSucursal = async (req, res) => {
 
     // Verificar que el código no exista en otra sucursal
     const existente = await getOne(
-      'SELECT id FROM sucursales WHERE codigo = ? AND id != ?',
-      [codigo, id]
+      'SELECT id FROM sucursales WHERE empresa_id = ? AND codigo = ? AND id != ?',
+      [empresaId, codigo, id]
     );
 
     if (existente) {
@@ -154,10 +159,11 @@ export const updateSucursal = async (req, res) => {
         email = ?,
         responsable = ?,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE empresa_id = ?
+      AND id = ?
     `, [
       codigo, nombre, direccion, pais, provincia, ciudad,
-      codigo_postal, telefono, email, responsable, id
+      codigo_postal, telefono, email, responsable, empresaId, id
     ]);
 
     res.json({ message: 'Sucursal actualizada exitosamente' });
@@ -171,8 +177,9 @@ export const updateSucursal = async (req, res) => {
 export const toggleSucursal = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    const sucursal = await getOne('SELECT activa FROM sucursales WHERE id = ?', [id]);
+    const sucursal = await getOne('SELECT activa FROM sucursales WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     if (!sucursal) {
       return res.status(404).json({ error: 'Sucursal no encontrada' });
@@ -181,8 +188,8 @@ export const toggleSucursal = async (req, res) => {
     const nuevoEstado = sucursal.activa ? 0 : 1;
 
     await runQuery(
-      'UPDATE sucursales SET activa = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [nuevoEstado, id]
+      'UPDATE sucursales SET activa = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+      [nuevoEstado, empresaId, id]
     );
 
     res.json({
@@ -198,8 +205,9 @@ export const toggleSucursal = async (req, res) => {
 export const deleteSucursal = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    const sucursal = await getOne('SELECT * FROM sucursales WHERE id = ?', [id]);
+    const sucursal = await getOne('SELECT * FROM sucursales WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     if (!sucursal) {
       return res.status(404).json({ error: 'Sucursal no encontrada' });
@@ -215,7 +223,7 @@ export const deleteSucursal = async (req, res) => {
     // TODO: Verificar que no tenga registros asociados (ventas, usuarios, etc.)
     // Por ahora permitimos eliminar
 
-    await runQuery('DELETE FROM sucursales WHERE id = ?', [id]);
+    await runQuery('DELETE FROM sucursales WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     res.json({ message: 'Sucursal eliminada exitosamente' });
   } catch (error) {

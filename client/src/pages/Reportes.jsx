@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import Layout from '../components/Layout';
 import {
@@ -88,7 +89,7 @@ const Reportes = () => {
             Accede a análisis detallados y reportes del negocio
           </p>
         </div>
-        <button onClick={() => navigate('/dashboard')} style={styles.dashboardButton}>
+        <button onClick={() => navigate(buildTenantPath('/dashboard'))} style={styles.dashboardButton}>
           <BarChart3 size={18} style={{ marginRight: '6px' }} />
           Ver Dashboard
         </button>
@@ -114,7 +115,7 @@ const Reportes = () => {
             <div
               key={reporte.id}
               style={styles.card}
-              onClick={() => navigate(reporte.path)}
+              onClick={() => navigate(buildTenantPath(reporte.path))}
             >
               <div style={styles.cardHeader}>
                 <div style={{
@@ -159,28 +160,28 @@ const Reportes = () => {
         <h2 style={styles.quickAccessTitle}>Acceso Rápido</h2>
         <div style={styles.quickAccessGrid}>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(buildTenantPath('/dashboard'))}
             style={styles.quickAccessButton}
           >
             <BarChart3 size={20} />
             <span>Dashboard</span>
           </button>
           <button
-            onClick={() => navigate('/ventas')}
+            onClick={() => navigate(buildTenantPath('/ventas'))}
             style={styles.quickAccessButton}
           >
             <TrendingUp size={20} />
             <span>Ventas</span>
           </button>
           <button
-            onClick={() => navigate('/productos')}
+            onClick={() => navigate(buildTenantPath('/productos'))}
             style={styles.quickAccessButton}
           >
             <Package size={20} />
             <span>Productos</span>
           </button>
           <button
-            onClick={() => navigate('/clientes')}
+            onClick={() => navigate(buildTenantPath('/clientes'))}
             style={styles.quickAccessButton}
           >
             <Users size={20} />

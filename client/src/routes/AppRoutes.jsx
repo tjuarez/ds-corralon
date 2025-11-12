@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import ProtectedRoute from '../components/ProtectedRoute';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
@@ -43,174 +43,84 @@ import UsuarioForm from '../pages/UsuarioForm';
 import Configuracion from '../pages/Configuracion';
 import MovimientosStock from '../pages/MovimientosStock';
 
+// Componente de redirección a tenant por defecto
+const RedirectToDefaultTenant = () => {
+  return <Navigate to="/demo/login" replace />;
+};
+
 const AppRoutes = () => {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      {/* Ruta raíz: redirigir a tenant por defecto */}
+      <Route path="/" element={<RedirectToDefaultTenant />} />
+
+      {/* Rutas públicas con tenant */}
+      <Route path="/:tenant/login" element={<Login />} />
+      <Route path="/:tenant/register" element={<Register />} />
       
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
+      {/* Rutas protegidas con tenant */}
+      <Route path="/:tenant/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
-      <Route
-        path="/clientes"
-        element={
-          <ProtectedRoute>
-            <Clientes />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
+      <Route path="/:tenant/clientes/nuevo" element={<ProtectedRoute><ClienteForm /></ProtectedRoute>} />
+      <Route path="/:tenant/clientes/:id" element={<ProtectedRoute><ClienteDetalle /></ProtectedRoute>} />
+      <Route path="/:tenant/clientes/:id/editar" element={<ProtectedRoute><ClienteForm /></ProtectedRoute>} />
 
-      <Route
-        path="/clientes/nuevo"
-        element={
-          <ProtectedRoute>
-            <ClienteForm />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
+      <Route path="/:tenant/productos/nuevo" element={<ProtectedRoute><ProductoForm /></ProtectedRoute>} />
+      <Route path="/:tenant/productos/:id/editar" element={<ProtectedRoute><ProductoForm /></ProtectedRoute>} />
+      <Route path="/:tenant/productos/:id" element={<ProtectedRoute><ProductoDetalle /></ProtectedRoute>} />
 
-      <Route
-        path="/clientes/:id"
-        element={
-          <ProtectedRoute>
-            <ClienteDetalle />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/proveedores" element={<ProtectedRoute><Proveedores /></ProtectedRoute>} />
+      <Route path="/:tenant/proveedores/nuevo" element={<ProtectedRoute><ProveedorForm /></ProtectedRoute>} />
+      <Route path="/:tenant/proveedores/:id" element={<ProtectedRoute><ProveedorDetalle /></ProtectedRoute>} />
+      <Route path="/:tenant/proveedores/:id/editar" element={<ProtectedRoute><ProveedorForm /></ProtectedRoute>} />
 
-      <Route
-        path="/clientes/:id/editar"
-        element={
-          <ProtectedRoute>
-            <ClienteForm />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/presupuestos" element={<ProtectedRoute><Presupuestos /></ProtectedRoute>} />
+      <Route path="/:tenant/presupuestos/nuevo" element={<ProtectedRoute><PresupuestoForm /></ProtectedRoute>} />
+      <Route path="/:tenant/presupuestos/:id" element={<ProtectedRoute><PresupuestoDetalle /></ProtectedRoute>} />
+      <Route path="/:tenant/presupuestos/:id/editar" element={<ProtectedRoute><PresupuestoForm /></ProtectedRoute>} />
 
-      <Route
-        path="/productos"
-        element={
-          <ProtectedRoute>
-            <Productos />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/ventas" element={<ProtectedRoute><Ventas /></ProtectedRoute>} />
+      <Route path="/:tenant/ventas/nueva" element={<ProtectedRoute><VentaForm /></ProtectedRoute>} />
+      <Route path="/:tenant/ventas/:id" element={<ProtectedRoute><VentaDetalle /></ProtectedRoute>} />
 
-      <Route
-        path="/productos/nuevo"
-        element={
-          <ProtectedRoute>
-            <ProductoForm />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/compras" element={<ProtectedRoute><Compras /></ProtectedRoute>} />
+      <Route path="/:tenant/compras/nueva" element={<ProtectedRoute><CompraForm /></ProtectedRoute>} />
+      <Route path="/:tenant/compras/:id" element={<ProtectedRoute><CompraDetalle /></ProtectedRoute>} />
 
-      <Route
-        path="/productos/:id/editar"
-        element={
-          <ProtectedRoute>
-            <ProductoForm />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/cuenta-corriente" element={<ProtectedRoute><CuentaCorriente /></ProtectedRoute>} />
+      <Route path="/:tenant/cuenta-corriente/:clienteId" element={<ProtectedRoute><EstadoCuenta /></ProtectedRoute>} />
+      <Route path="/:tenant/cuenta-corriente/:clienteId/pago" element={<ProtectedRoute><RegistrarPago /></ProtectedRoute>} />
 
-      <Route
-        path="/productos/:id"
-        element={
-          <ProtectedRoute>
-            <ProductoDetalle />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/caja" element={<ProtectedRoute><Caja /></ProtectedRoute>} />
+      <Route path="/:tenant/caja/abrir" element={<ProtectedRoute><AbrirCaja /></ProtectedRoute>} />
+      <Route path="/:tenant/caja/:id" element={<ProtectedRoute><CajaDetalle /></ProtectedRoute>} />
+      <Route path="/:tenant/caja/:id/movimiento" element={<ProtectedRoute><RegistrarMovimientoCaja /></ProtectedRoute>} />
+      <Route path="/:tenant/caja/:id/cerrar" element={<ProtectedRoute><CerrarCaja /></ProtectedRoute>} />
 
-      <Route
-        path="/proveedores"
-        element={
-          <ProtectedRoute>
-            <Proveedores />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/reportes" element={<ProtectedRoute><Reportes /></ProtectedRoute>} />
+      <Route path="/:tenant/reportes/ventas" element={<ProtectedRoute><ReporteVentas /></ProtectedRoute>} />
+      <Route path="/:tenant/reportes/productos" element={<ProtectedRoute><ReporteProductos /></ProtectedRoute>} />
+      <Route path="/:tenant/reportes/stock" element={<ProtectedRoute><ReporteStock /></ProtectedRoute>} />
+      <Route path="/:tenant/reportes/clientes" element={<ProtectedRoute><ReporteClientes /></ProtectedRoute>} />
+      <Route path="/:tenant/reportes/caja" element={<ProtectedRoute><ReporteCaja /></ProtectedRoute>} />
+      <Route path="/:tenant/reportes/rentabilidad" element={<ProtectedRoute><ReporteRentabilidad /></ProtectedRoute>} />
 
-      <Route
-        path="/proveedores/nuevo"
-        element={
-          <ProtectedRoute>
-            <ProveedorForm />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/sucursales" element={<ProtectedRoute><Sucursales /></ProtectedRoute>} />
+      <Route path="/:tenant/sucursales/nueva" element={<ProtectedRoute><SucursalForm /></ProtectedRoute>} />
+      <Route path="/:tenant/sucursales/:id/editar" element={<ProtectedRoute><SucursalForm /></ProtectedRoute>} />
 
-      <Route
-        path="/proveedores/:id"
-        element={
-          <ProtectedRoute>
-            <ProveedorDetalle />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/usuarios" element={<ProtectedRoute><Usuarios /></ProtectedRoute>} />
+      <Route path="/:tenant/usuarios/nuevo" element={<ProtectedRoute><UsuarioForm /></ProtectedRoute>} />
+      <Route path="/:tenant/usuarios/:id/editar" element={<ProtectedRoute><UsuarioForm /></ProtectedRoute>} />
 
-      <Route
-        path="/proveedores/:id/editar"
-        element={
-          <ProtectedRoute>
-            <ProveedorForm />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/:tenant/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
 
-      <Route path="/presupuestos" element={<Presupuestos />} />
-      <Route path="/presupuestos/nuevo" element={<PresupuestoForm />} />
-      <Route path="/presupuestos/:id" element={<PresupuestoDetalle />} />
-      <Route path="/presupuestos/:id/editar" element={<PresupuestoForm />} />
+      <Route path="/:tenant/movimientos-stock" element={<ProtectedRoute><MovimientosStock /></ProtectedRoute>} />
 
-      <Route path="/ventas" element={<Ventas />} />
-      <Route path="/ventas/nueva" element={<VentaForm />} />
-      <Route path="/ventas/:id" element={<VentaDetalle />} />
-
-      <Route path="/compras" element={<Compras />} />
-      <Route path="/compras/nueva" element={<CompraForm />} />
-      <Route path="/compras/:id" element={<CompraDetalle />} />
-
-      <Route path="/cuenta-corriente" element={<CuentaCorriente />} />
-      <Route path="/cuenta-corriente/:clienteId" element={<EstadoCuenta />} />
-      <Route path="/cuenta-corriente/:clienteId/pago" element={<RegistrarPago />} />
-
-      <Route path="/caja" element={<Caja />} />
-      <Route path="/caja/abrir" element={<AbrirCaja />} />
-      <Route path="/caja/:id" element={<CajaDetalle />} />
-      <Route path="/caja/:id/movimiento" element={<RegistrarMovimientoCaja />} />
-      <Route path="/caja/:id/cerrar" element={<CerrarCaja />} />
-
-      <Route path="/reportes" element={<Reportes />} />
-      <Route path="/reportes/ventas" element={<ReporteVentas />} />
-      <Route path="/reportes/productos" element={<ReporteProductos />} />
-      <Route path="/reportes/stock" element={<ReporteStock />} />
-      <Route path="/reportes/clientes" element={<ReporteClientes />} />
-      <Route path="/reportes/caja" element={<ReporteCaja />} />
-      <Route path="/reportes/rentabilidad" element={<ReporteRentabilidad />} />
-
-      <Route path="/sucursales" element={<Sucursales />} />
-      <Route path="/sucursales/nueva" element={<SucursalForm />} />
-      <Route path="/sucursales/:id/editar" element={<SucursalForm />} />
-
-      <Route path="/usuarios" element={<Usuarios />} />
-      <Route path="/usuarios/nuevo" element={<UsuarioForm />} />
-      <Route path="/usuarios/:id/editar" element={<UsuarioForm />} />
-
-      <Route path="/configuracion" element={<Configuracion />} />
-
-      <Route path="/movimientos-stock" element={<ProtectedRoute><MovimientosStock /></ProtectedRoute>} />
-
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Catch-all: redirigir a tenant por defecto */}
+      <Route path="*" element={<RedirectToDefaultTenant />} />
     </Routes>
   );
 };

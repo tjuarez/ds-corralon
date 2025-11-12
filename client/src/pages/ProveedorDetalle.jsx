@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { proveedoresApi } from '../api/proveedores';
@@ -26,7 +27,7 @@ const ProveedorDetalle = () => {
       setProveedor(data.proveedor);
     } catch (error) {
       showError(error.message);
-      navigate('/proveedores');
+      navigate(buildTenantPath('/proveedores'));
     } finally {
       setLoading(false);
     }
@@ -42,7 +43,7 @@ const ProveedorDetalle = () => {
     try {
       await proveedoresApi.delete(id);
       showSuccess('Proveedor eliminado exitosamente');
-      navigate('/proveedores');
+      navigate(buildTenantPath('/proveedores'));
     } catch (error) {
       showError(error.message);
     }
@@ -74,14 +75,14 @@ const ProveedorDetalle = () => {
         </div>
         <div style={styles.headerActions}>
           <button
-            onClick={() => navigate('/proveedores')}
+            onClick={() => navigate(buildTenantPath('/proveedores'))}
             style={styles.backButton}
           >
             <ArrowLeft size={18} style={{ marginRight: '6px' }} />
             {t('back')}
           </button>
           <button
-            onClick={() => navigate(`/proveedores/${id}/editar`)}
+            onClick={() => navigate(buildTenantPath(`/proveedores/${id}/editar`))}
             style={styles.editButton}
           >
             <Edit size={18} style={{ marginRight: '6px' }} />
@@ -208,7 +209,7 @@ const ProveedorDetalle = () => {
                 <div 
                   key={producto.id} 
                   style={styles.productCard}
-                  onClick={() => navigate(`/productos/${producto.id}`)}
+                  onClick={() => navigate(buildTenantPath(`/productos/${producto.id}`))}
                 >
                   <div style={styles.productCode}>{producto.codigo}</div>
                   <div style={styles.productDescription}>{producto.descripcion}</div>

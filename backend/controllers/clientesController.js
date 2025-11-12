@@ -1,17 +1,19 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todos los clientes (con búsqueda y filtros)
 export const getClientes = async (req, res) => {
   try {
     const { search, tipo_cliente, activo } = req.query;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT c.*, 
              (SELECT COUNT(*) FROM clientes_contactos WHERE cliente_id = c.id) as contactos_count
       FROM clientes c
-      WHERE 1=1
+      WHERE c.empresa_id = ?
     `;
-    const params = [];
+    const params = [empresaId];
 
     // Búsqueda por texto
     if (search) {
@@ -38,7 +40,7 @@ export const getClientes = async (req, res) => {
     res.json({ clientes });
   } catch (error) {
     console.error('Error en getClientes:', error);
-    res.status(500).json({ error: 'Error al obtener clientes' });
+    res.status(500).json({ error: error.message || 'Error al obtener clientes' });
   }
 };
 
@@ -46,10 +48,11 @@ export const getClientes = async (req, res) => {
 export const getClienteById = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const cliente = await getOne(
-      'SELECT * FROM clientes WHERE id = ?',
-      [id]
+      'SELECT * FROM clientes WHERE id = ? AND empresa_id = ?',
+      [id, empresaId]
     );
 
     if (!cliente) {
@@ -65,7 +68,7 @@ export const getClienteById = async (req, res) => {
     res.json({ cliente: { ...cliente, contactos } });
   } catch (error) {
     console.error('Error en getClienteById:', error);
-    res.status(500).json({ error: 'Error al obtener cliente' });
+    res.status(500).json({ error: error.message || 'Error al obtener cliente' });
   }
 };
 
@@ -90,6 +93,8 @@ export const createCliente = async (req, res) => {
       observaciones,
     } = req.body;
 
+    const empresaId = getEmpresaId(req);
+
     // Validaciones
     if (!tipo_cliente || !razon_social) {
       return res.status(400).json({ 
@@ -97,16 +102,16 @@ export const createCliente = async (req, res) => {
       });
     }
 
-    // Verificar si el CUIT/DNI ya existe (si se proporciona)
+    // Verificar si el CUIT/DNI ya existe en esta empresa
     if (cuit_dni) {
       const existing = await getOne(
-        'SELECT id FROM clientes WHERE cuit_dni = ?',
-        [cuit_dni]
+        'SELECT id FROM clientes WHERE cuit_dni = ? AND empresa_id = ?',
+        [cuit_dni, empresaId]
       );
 
       if (existing) {
         return res.status(409).json({ 
-          error: 'Ya existe un cliente con ese CUIT/DNI' 
+          error: 'Ya existe un cliente con ese CUIT/DNI en esta empresa' 
         });
       }
     }
@@ -115,12 +120,12 @@ export const createCliente = async (req, res) => {
       `INSERT INTO clientes (
         tipo_cliente, razon_social, nombre_fantasia, cuit_dni, telefono, email,
         direccion, pais, localidad, provincia, codigo_postal, limite_credito,
-        condicion_pago, lista_precio_id, observaciones, activo
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        condicion_pago, lista_precio_id, observaciones, activo, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
       [
         tipo_cliente, razon_social, nombre_fantasia, cuit_dni, telefono, email,
         direccion, pais, localidad, provincia, codigo_postal, limite_credito || 0,
-        condicion_pago || 'contado', lista_precio_id, observaciones
+        condicion_pago || 'contado', lista_precio_id, observaciones, empresaId
       ]
     );
 
@@ -130,7 +135,7 @@ export const createCliente = async (req, res) => {
     });
   } catch (error) {
     console.error('Error en createCliente:', error);
-    res.status(500).json({ error: 'Error al crear cliente' });
+    res.status(500).json({ error: error.message || 'Error al crear cliente' });
   }
 };
 
@@ -157,22 +162,28 @@ export const updateCliente = async (req, res) => {
       activo,
     } = req.body;
 
-    // Verificar que el cliente existe
-    const cliente = await getOne('SELECT id FROM clientes WHERE id = ?', [id]);
+    const empresaId = getEmpresaId(req);
+
+    // Verificar que el cliente existe y pertenece a esta empresa
+    const cliente = await getOne(
+      'SELECT id FROM clientes WHERE id = ? AND empresa_id = ?',
+      [id, empresaId]
+    );
+    
     if (!cliente) {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
-    // Verificar si el CUIT/DNI ya existe en otro cliente
+    // Verificar si el CUIT/DNI ya existe en otro cliente de esta empresa
     if (cuit_dni) {
       const existing = await getOne(
-        'SELECT id FROM clientes WHERE cuit_dni = ? AND id != ?',
-        [cuit_dni, id]
+        'SELECT id FROM clientes WHERE cuit_dni = ? AND id != ? AND empresa_id = ?',
+        [cuit_dni, id, empresaId]
       );
 
       if (existing) {
         return res.status(409).json({ 
-          error: 'Ya existe otro cliente con ese CUIT/DNI' 
+          error: 'Ya existe otro cliente con ese CUIT/DNI en esta empresa' 
         });
       }
     }
@@ -184,18 +195,19 @@ export const updateCliente = async (req, res) => {
         codigo_postal = ?, limite_credito = ?, condicion_pago = ?,
         lista_precio_id = ?, observaciones = ?, activo = ?,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?`,
+      WHERE id = ? AND empresa_id = ?`,
       [
         tipo_cliente, razon_social, nombre_fantasia, cuit_dni, telefono, email,
         direccion, pais, localidad, provincia, codigo_postal, limite_credito,
-        condicion_pago, lista_precio_id, observaciones, activo !== undefined ? activo : 1, id
+        condicion_pago, lista_precio_id, observaciones, activo !== undefined ? activo : 1, 
+        id, empresaId
       ]
     );
 
     res.json({ message: 'Cliente actualizado exitosamente' });
   } catch (error) {
     console.error('Error en updateCliente:', error);
-    res.status(500).json({ error: 'Error al actualizar cliente' });
+    res.status(500).json({ error: error.message || 'Error al actualizar cliente' });
   }
 };
 
@@ -203,17 +215,22 @@ export const updateCliente = async (req, res) => {
 export const deleteCliente = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    // Verificar que el cliente existe
-    const cliente = await getOne('SELECT id FROM clientes WHERE id = ?', [id]);
+    // Verificar que el cliente existe y pertenece a esta empresa
+    const cliente = await getOne(
+      'SELECT id FROM clientes WHERE id = ? AND empresa_id = ?',
+      [id, empresaId]
+    );
+    
     if (!cliente) {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
     // Verificar si tiene ventas asociadas
     const ventas = await getOne(
-      'SELECT COUNT(*) as count FROM ventas WHERE cliente_id = ?',
-      [id]
+      'SELECT COUNT(*) as count FROM ventas WHERE cliente_id = ? AND empresa_id = ?',
+      [id, empresaId]
     );
 
     if (ventas.count > 0) {
@@ -224,14 +241,14 @@ export const deleteCliente = async (req, res) => {
 
     // Soft delete
     await runQuery(
-      'UPDATE clientes SET activo = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [id]
+      'UPDATE clientes SET activo = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND empresa_id = ?',
+      [id, empresaId]
     );
 
     res.json({ message: 'Cliente eliminado exitosamente' });
   } catch (error) {
     console.error('Error en deleteCliente:', error);
-    res.status(500).json({ error: 'Error al eliminar cliente' });
+    res.status(500).json({ error: error.message || 'Error al eliminar cliente' });
   }
 };
 
@@ -240,9 +257,14 @@ export const addContacto = async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre, cargo, telefono, email, principal } = req.body;
+    const empresaId = getEmpresaId(req);
 
-    // Verificar que el cliente existe
-    const cliente = await getOne('SELECT id FROM clientes WHERE id = ?', [id]);
+    // Verificar que el cliente existe y pertenece a esta empresa
+    const cliente = await getOne(
+      'SELECT id FROM clientes WHERE id = ? AND empresa_id = ?',
+      [id, empresaId]
+    );
+    
     if (!cliente) {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
@@ -256,9 +278,9 @@ export const addContacto = async (req, res) => {
     }
 
     const result = await runQuery(
-      `INSERT INTO clientes_contactos (cliente_id, nombre, cargo, telefono, email, principal)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, nombre, cargo, telefono, email, principal ? 1 : 0]
+      `INSERT INTO clientes_contactos (cliente_id, nombre, cargo, telefono, email, principal, empresa_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, nombre, cargo, telefono, email, principal ? 1 : 0, empresaId]
     );
 
     res.status(201).json({
@@ -267,7 +289,7 @@ export const addContacto = async (req, res) => {
     });
   } catch (error) {
     console.error('Error en addContacto:', error);
-    res.status(500).json({ error: 'Error al agregar contacto' });
+    res.status(500).json({ error: error.message || 'Error al agregar contacto' });
   }
 };
 
@@ -275,12 +297,26 @@ export const addContacto = async (req, res) => {
 export const deleteContacto = async (req, res) => {
   try {
     const { contactoId } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    await runQuery('DELETE FROM clientes_contactos WHERE id = ?', [contactoId]);
+    // Verificar que el contacto pertenece a esta empresa
+    const contacto = await getOne(
+      'SELECT id FROM clientes_contactos WHERE id = ? AND empresa_id = ?',
+      [contactoId, empresaId]
+    );
+
+    if (!contacto) {
+      return res.status(404).json({ error: 'Contacto no encontrado' });
+    }
+
+    await runQuery(
+      'DELETE FROM clientes_contactos WHERE id = ? AND empresa_id = ?',
+      [contactoId, empresaId]
+    );
 
     res.json({ message: 'Contacto eliminado exitosamente' });
   } catch (error) {
     console.error('Error en deleteContacto:', error);
-    res.status(500).json({ error: 'Error al eliminar contacto' });
+    res.status(500).json({ error: error.message || 'Error al eliminar contacto' });
   }
 };

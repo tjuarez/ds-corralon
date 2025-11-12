@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -36,7 +37,7 @@ const RegistrarPago = () => {
       setCliente(data.cliente);
     } catch (error) {
       showError(error.message);
-      navigate('/cuenta-corriente');
+      navigate(buildTenantPath('/cuenta-corriente'));
     }
   };
 
@@ -76,7 +77,7 @@ const RegistrarPago = () => {
 
       const result = await cuentaCorrienteApi.registrarPago(dataToSend);
       showSuccess(`Pago registrado exitosamente. Nuevo saldo: ${formatCurrency(result.saldo_nuevo, '$')}`);
-      navigate(`/cuenta-corriente/${clienteId}`);
+      navigate(buildTenantPath(`/cuenta-corriente/${clienteId}`));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -106,7 +107,7 @@ const RegistrarPago = () => {
           <p style={styles.subtitle}>{cliente.razon_social}</p>
         </div>
         <button
-          onClick={() => navigate(`/cuenta-corriente/${clienteId}`)}
+          onClick={() => navigate(buildTenantPath(`/cuenta-corriente/${clienteId}`))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -266,7 +267,7 @@ const RegistrarPago = () => {
           <div style={styles.actions}>
             <button
               type="button"
-              onClick={() => navigate(`/cuenta-corriente/${clienteId}`)}
+              onClick={() => navigate(buildTenantPath(`/cuenta-corriente/${clienteId}`))}
               style={styles.cancelButton}
               disabled={loading}
             >

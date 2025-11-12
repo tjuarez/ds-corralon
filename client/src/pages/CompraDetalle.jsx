@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -43,7 +44,7 @@ const CompraDetalle = () => {
       setCompra(data.compra);
     } catch (error) {
       showError(error.message);
-      navigate('/compras');
+      navigate(buildTenantPath('/compras'));
     } finally {
       setLoading(false);
     }
@@ -167,7 +168,7 @@ const CompraDetalle = () => {
           <p style={styles.subtitle}>Detalles completos de la compra</p>
         </div>
         <div style={styles.headerActions}>
-          <button onClick={() => navigate('/compras')} style={styles.backButton}>
+          <button onClick={() => navigate(buildTenantPath('/compras'))} style={styles.backButton}>
             <ArrowLeft size={18} style={{ marginRight: '6px' }} />
             Volver
           </button>

@@ -1,11 +1,13 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
 import { enviarPresupuestoPorEmail } from '../services/emailService.js';
 import { getCotizacionActual } from '../utils/cotizacion.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todos los presupuestos (con búsqueda y filtros)
 export const getPresupuestos = async (req, res) => {
   try {
     const { search, estado, fecha_desde, fecha_hasta, cliente_id } = req.query;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT p.*, 
@@ -15,12 +17,12 @@ export const getPresupuestos = async (req, res) => {
              m.simbolo as moneda_simbolo,
              u.nombre || ' ' || u.apellido as usuario_nombre
       FROM presupuestos p
-      LEFT JOIN clientes c ON p.cliente_id = c.id
-      LEFT JOIN monedas m ON p.moneda_id = m.id
-      LEFT JOIN usuarios u ON p.usuario_id = u.id
-      WHERE 1=1
+      LEFT JOIN clientes c ON p.empresa_id = c.empresa_id AND p.cliente_id = c.id
+      LEFT JOIN monedas m ON p.empresa_id = m.empresa_id AND p.moneda_id = m.id
+      LEFT JOIN usuarios u ON p.empresa_id =u.empresa_id AND p.usuario_id = u.id
+      WHERE p.empresa_id = ?
     `;
-    const params = [];
+    const params = [empresaId];
 
     // Búsqueda por número o cliente
     if (search) {
@@ -65,6 +67,7 @@ export const getPresupuestos = async (req, res) => {
 export const getPresupuestoById = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const presupuesto = await getOne(`
       SELECT p.*, 
@@ -79,11 +82,12 @@ export const getPresupuestoById = async (req, res) => {
              u.nombre || ' ' || u.apellido as usuario_nombre,
              p.cotizacion_momento
       FROM presupuestos p
-      LEFT JOIN clientes c ON p.cliente_id = c.id
-      LEFT JOIN monedas m ON p.moneda_id = m.id
-      LEFT JOIN usuarios u ON p.usuario_id = u.id
-      WHERE p.id = ?
-    `, [id]);
+      LEFT JOIN clientes c ON p.empresa_id = c.empresa_id AND p.cliente_id = c.id
+      LEFT JOIN monedas m ON p.empresa_id = m.empresa_id AND p.moneda_id = m.id
+      LEFT JOIN usuarios u ON p.empresa_id = u.empresa_id AND p.usuario_id = u.id
+      WHERE p.empresa_id = ?
+      AND p.id = ?
+    `, [empresaId, id]);
 
     if (!presupuesto) {
       return res.status(404).json({ error: 'Presupuesto no encontrado' });
@@ -96,10 +100,11 @@ export const getPresupuestoById = async (req, res) => {
              pr.descripcion as producto_descripcion,
              pr.unidad_medida as producto_unidad
       FROM presupuestos_detalle pd
-      LEFT JOIN productos pr ON pd.producto_id = pr.id
-      WHERE pd.presupuesto_id = ?
+      LEFT JOIN productos pr ON pd.empresa_id = pr.empresa_id AND pd.producto_id = pr.id
+      WHERE pd.empresa_id = ?
+      AND pd.presupuesto_id = ?
       ORDER BY pd.id ASC
-    `, [id]);
+    `, [empresaId, id]);
 
     res.json({ 
       presupuesto: { 
@@ -116,11 +121,14 @@ export const getPresupuestoById = async (req, res) => {
 // Generar número de presupuesto
 const generateNumeroPresupuesto = async () => {
   const year = new Date().getFullYear();
+  const empresaId = getEmpresaId(req);
+
   const lastPresupuesto = await getOne(
     `SELECT numero FROM presupuestos 
-     WHERE numero LIKE ? 
+     WHERE empresa_id = ?
+     AND numero LIKE ? 
      ORDER BY numero DESC LIMIT 1`,
-    [`PRES-${year}-%`]
+    [empresaId, `PRES-${year}-%`]
   );
 
   let nextNumber = 1;
@@ -146,6 +154,7 @@ export const createPresupuesto = async (req, res) => {
       observaciones,
       usuario_id
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Validaciones
     if (!cliente_id || !fecha || !moneda_id || !detalle || detalle.length === 0) {
@@ -169,12 +178,12 @@ export const createPresupuesto = async (req, res) => {
     }
 
     // Verificar que el cliente existe
-    const cliente = await getOne('SELECT id FROM clientes WHERE id = ?', [cliente_id]);
+    const cliente = await getOne('SELECT id FROM clientes WHERE empresa_id = ? AND id = ?', [empresaId, cliente_id]);
     if (!cliente) {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
 
-// ========== OBTENER COTIZACIÓN DEL MOMENTO ==========
+    // ========== OBTENER COTIZACIÓN DEL MOMENTO ==========
     const cotizacionMomento = await getCotizacionActual();
     console.log(`💱 Cotización del momento: ${cotizacionMomento}`);
 
@@ -197,12 +206,12 @@ export const createPresupuesto = async (req, res) => {
       INSERT INTO presupuestos (
         numero, cliente_id, fecha, fecha_vencimiento, moneda_id,
         subtotal, descuento_porcentaje, descuento_monto, impuestos, total,
-        estado, observaciones, usuario_id, cotizacion_momento
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'pendiente', ?, ?, ?)
+        estado, observaciones, usuario_id, cotizacion_momento, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'pendiente', ?, ?, ?, ?)
     `, [
       numero, cliente_id, fecha, fecha_vencimiento, moneda_id,
       subtotal, descuento_porcentaje || 0, descuentoMonto, total,
-      observaciones, usuario_id, cotizacionMomento
+      observaciones, usuario_id, cotizacionMomento, empresaId
     ]);
 
     const presupuestoId = result.id;
@@ -216,12 +225,12 @@ export const createPresupuesto = async (req, res) => {
       await runQuery(`
         INSERT INTO presupuestos_detalle (
           presupuesto_id, producto_id, descripcion, cantidad,
-          precio_unitario, descuento_porcentaje, subtotal
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          precio_unitario, descuento_porcentaje, subtotal, empresa_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         presupuestoId, item.producto_id, item.descripcion,
         item.cantidad, item.precio_unitario,
-        item.descuento_porcentaje || 0, itemTotal
+        item.descuento_porcentaje || 0, itemTotal, empresaId
       ]);
     }
 
@@ -250,11 +259,12 @@ export const updatePresupuesto = async (req, res) => {
       descuento_monto,
       observaciones
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Verificar que el presupuesto existe y no está convertido
     const presupuesto = await getOne(
-      'SELECT id, estado FROM presupuestos WHERE id = ?',
-      [id]
+      'SELECT id, estado FROM presupuestos WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
     
     if (!presupuesto) {
@@ -284,15 +294,16 @@ export const updatePresupuesto = async (req, res) => {
         cliente_id = ?, fecha = ?, fecha_vencimiento = ?, moneda_id = ?,
         subtotal = ?, descuento_porcentaje = ?, descuento_monto = ?,
         total = ?, observaciones = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE empresa_id = ?
+      AND id = ?
     `, [
       cliente_id, fecha, fecha_vencimiento, moneda_id,
       subtotal, descuento_porcentaje || 0, descuentoMonto,
-      total, observaciones, id
+      total, observaciones, empresaId, id
     ]);
 
     // Eliminar detalle anterior
-    await runQuery('DELETE FROM presupuestos_detalle WHERE presupuesto_id = ?', [id]);
+    await runQuery('DELETE FROM presupuestos_detalle WHERE empresa_id = ? AND presupuesto_id = ?', [empresaId, id]);
 
     // Insertar nuevo detalle
     for (const item of detalle) {
@@ -303,12 +314,12 @@ export const updatePresupuesto = async (req, res) => {
       await runQuery(`
         INSERT INTO presupuestos_detalle (
           presupuesto_id, producto_id, descripcion, cantidad,
-          precio_unitario, descuento_porcentaje, subtotal
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          precio_unitario, descuento_porcentaje, subtotal, empresa_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         id, item.producto_id, item.descripcion,
         item.cantidad, item.precio_unitario,
-        item.descuento_porcentaje || 0, itemTotal
+        item.descuento_porcentaje || 0, itemTotal, empresaId
       ]);
     }
 
@@ -324,6 +335,7 @@ export const updateEstado = async (req, res) => {
   try {
     const { id } = req.params;
     const { estado } = req.body;
+    const empresaId = getEmpresaId(req);
 
     const estadosValidos = ['pendiente', 'aprobado', 'rechazado', 'convertido'];
     if (!estadosValidos.includes(estado)) {
@@ -331,8 +343,8 @@ export const updateEstado = async (req, res) => {
     }
 
     const presupuesto = await getOne(
-      'SELECT id, estado FROM presupuestos WHERE id = ?',
-      [id]
+      'SELECT id, estado FROM presupuestos WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     if (!presupuesto) {
@@ -340,8 +352,8 @@ export const updateEstado = async (req, res) => {
     }
 
     await runQuery(
-      'UPDATE presupuestos SET estado = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [estado, id]
+      'UPDATE presupuestos SET estado = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+      [estado, empresaId, id]
     );
 
     res.json({ message: 'Estado actualizado exitosamente' });
@@ -355,10 +367,11 @@ export const updateEstado = async (req, res) => {
 export const deletePresupuesto = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const presupuesto = await getOne(
-      'SELECT id, estado FROM presupuestos WHERE id = ?',
-      [id]
+      'SELECT id, estado FROM presupuestos WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     if (!presupuesto) {
@@ -372,7 +385,7 @@ export const deletePresupuesto = async (req, res) => {
     }
 
     // Eliminar detalle (por CASCADE también se elimina automáticamente)
-    await runQuery('DELETE FROM presupuestos WHERE id = ?', [id]);
+    await runQuery('DELETE FROM presupuestos WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     res.json({ message: 'Presupuesto eliminado exitosamente' });
   } catch (error) {
@@ -386,6 +399,7 @@ export const enviarEmail = async (req, res) => {
   try {
     const { id } = req.params;
     const { emailDestino } = req.body;
+    const empresaId = getEmpresaId(req);
 
     if (!emailDestino) {
       return res.status(400).json({ error: 'Email de destino es requerido' });
@@ -406,10 +420,11 @@ export const enviarEmail = async (req, res) => {
              m.codigo as moneda_codigo,
              m.simbolo as moneda_simbolo
       FROM presupuestos p
-      LEFT JOIN clientes c ON p.cliente_id = c.id
-      LEFT JOIN monedas m ON p.moneda_id = m.id
-      WHERE p.id = ?
-    `, [id]);
+      LEFT JOIN clientes c ON p.empresa_id = c.empresa_id AND p.cliente_id = c.id
+      LEFT JOIN monedas m ON p.empresa_id = m.empresa_id AND p.moneda_id = m.id
+      WHERE p.empresa_id = ?
+      AND p.id = ?
+    `, [empresaId, id]);
 
     if (!presupuesto) {
       return res.status(404).json({ error: 'Presupuesto no encontrado' });
@@ -421,9 +436,10 @@ export const enviarEmail = async (req, res) => {
              pr.codigo as producto_codigo,
              pr.descripcion as producto_descripcion
       FROM presupuestos_detalle pd
-      LEFT JOIN productos pr ON pd.producto_id = pr.id
-      WHERE pd.presupuesto_id = ?
-    `, [id]);
+      LEFT JOIN productos pr ON pd.empresa_id = pr.empresa_id AND pd.producto_id = pr.id
+      WHERE pd.empresa_id = ?
+      AND pd.presupuesto_id = ?
+    `, [empresaId, id]);
 
     presupuesto.detalle = detalle;
 

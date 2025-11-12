@@ -1,12 +1,14 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
 import { actualizarStockTotal } from './stockSucursalesController.js';
 import { getCotizacionActual } from '../utils/cotizacion.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todas las ventas (con búsqueda y filtros)
 export const getVentas = async (req, res) => {
   try {
     const { fecha_desde, fecha_hasta, cliente_id, forma_pago, estado, sucursal_id } = req.query;
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT 
@@ -17,12 +19,12 @@ export const getVentas = async (req, res) => {
         u.apellido as usuario_apellido,
         s.nombre as sucursal_nombre
       FROM ventas v
-      LEFT JOIN clientes c ON v.cliente_id = c.id
-      LEFT JOIN usuarios u ON v.usuario_id = u.id
-      LEFT JOIN sucursales s ON v.sucursal_id = s.id
-      WHERE 1=1
+      LEFT JOIN clientes c ON v.empresa_id = c.empresa_id AND v.cliente_id = c.id
+      LEFT JOIN usuarios u ON v.empresa_id = u.empresa_id AND v.usuario_id = u.id
+      LEFT JOIN sucursales s ON v.empresa_id = s.empresa_id AND v.sucursal_id = s.id
+      WHERE v.empresa_id = ?
     `;
-    const params = [];
+    const params = [empresaId];
 
     // FILTRO CRÍTICO: Control por sucursal
     if (user.rol !== 'admin' || user.sucursal_id) {
@@ -82,6 +84,7 @@ export const getVentas = async (req, res) => {
 export const getVentaById = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const venta = await getOne(`
       SELECT v.*, 
@@ -96,11 +99,12 @@ export const getVentaById = async (req, res) => {
              u.nombre || ' ' || u.apellido as usuario_nombre,
              v.cotizacion_momento
       FROM ventas v
-      LEFT JOIN clientes c ON v.cliente_id = c.id
-      LEFT JOIN monedas m ON v.moneda_id = m.id
-      LEFT JOIN usuarios u ON v.usuario_id = u.id
-      WHERE v.id = ?
-    `, [id]);
+      LEFT JOIN clientes c ON v.empresa_id = c.empresa_id AND v.cliente_id = c.id
+      LEFT JOIN monedas m ON v.empresa_id = m.empresa_id AND v.moneda_id = m.id
+      LEFT JOIN usuarios u ON v.empresa_id = u.empresa_id AND v.usuario_id = u.id
+      WHERE v.empresa_id = ?
+      AND v.id = ?
+    `, [empresaId, id]);
 
     if (!venta) {
       return res.status(404).json({ error: 'Venta no encontrada' });
@@ -113,15 +117,16 @@ export const getVentaById = async (req, res) => {
             p.descripcion as producto_descripcion,
             p.unidad_medida as producto_unidad
       FROM ventas_detalle vd
-      LEFT JOIN productos p ON vd.producto_id = p.id
-      WHERE vd.venta_id = ?
+      LEFT JOIN productos p ON vd.empresa_id = p.empresa_id AND vd.producto_id = p.id
+      WHERE vd.empresa_id = ?
+      AND vd.venta_id = ?
       ORDER BY vd.id ASC
-    `, [id]);
+    `, [empresaId, id]);
 
     // Obtener formas de pago
     const pagos = await getAll(`
-      SELECT * FROM ventas_pagos WHERE venta_id = ? ORDER BY id ASC
-    `, [id]);
+      SELECT * FROM ventas_pagos WHERE empresa_id = ? AND venta_id = ? ORDER BY id ASC
+    `, [empresaId, id]);
 
     res.json({ 
       venta: { 
@@ -143,12 +148,14 @@ const generateNumeroComprobante = async (tipo_comprobante) => {
                      tipo_comprobante === 'factura_b' ? 'FB' : 
                      tipo_comprobante === 'factura_c' ? 'FC' : 
                      tipo_comprobante === 'remito' ? 'REM' : 'TK';
+  const empresaId = getEmpresaId(req);
 
   const lastVenta = await getOne(
     `SELECT numero_comprobante FROM ventas 
-     WHERE numero_comprobante LIKE ? 
+     WHERE empresa_id = ?
+     AND numero_comprobante LIKE ? 
      ORDER BY numero_comprobante DESC LIMIT 1`,
-    [`${tipoPrefix}-${year}-%`]
+    [empresaId, `${tipoPrefix}-${year}-%`]
   );
 
   let nextNumber = 1;
@@ -179,6 +186,7 @@ export const createVenta = async (req, res) => {
     } = req.body;
 
     const user = req.user;
+    const empresaId = getEmpresaId(req);
 
     // ========== VALIDACIÓN CRÍTICA: Usuario debe tener sucursal ==========
     if (!user.sucursal_id) {
@@ -202,7 +210,7 @@ export const createVenta = async (req, res) => {
     }
 
     // Verificar que el cliente existe
-    const cliente = await getOne('SELECT id FROM clientes WHERE id = ?', [cliente_id]);
+    const cliente = await getOne('SELECT id FROM clientes WHERE empresa_id = ? AND id = ?', [empresaId, cliente_id]);
     if (!cliente) {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
@@ -210,8 +218,8 @@ export const createVenta = async (req, res) => {
     // ========== VERIFICAR STOCK POR SUCURSAL ==========
     for (const item of detalle) {
       const producto = await getOne(
-        'SELECT id, codigo, descripcion FROM productos WHERE id = ?',
-        [item.producto_id]
+        'SELECT id, codigo, descripcion FROM productos WHERE empresa_id = ? AND id = ?',
+        [empresaId, item.producto_id]
       );
 
       if (!producto) {
@@ -222,8 +230,8 @@ export const createVenta = async (req, res) => {
 
       // Verificar stock en la sucursal
       const stockSucursal = await getOne(
-        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-        [item.producto_id, user.sucursal_id]
+        'SELECT stock_actual FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+        [empresaId, item.producto_id, user.sucursal_id]
       );
 
       if (!stockSucursal) {
@@ -273,12 +281,12 @@ export const createVenta = async (req, res) => {
       INSERT INTO ventas (
         numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
         subtotal, descuento_porcentaje, descuento_monto, impuestos, total,
-        forma_pago, estado, observaciones, presupuesto_id, usuario_id, sucursal_id, cotizacion_momento
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?, ?, ?)
+        forma_pago, estado, observaciones, presupuesto_id, usuario_id, sucursal_id, cotizacion_momento, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completada', ?, ?, ?, ?, ?, ?)
     `, [
       numero_comprobante, tipo_comprobante, cliente_id, fecha, moneda_id,
       subtotal, descuento_porcentaje || 0, descuentoMonto, 0, total,
-      formaPagoVenta, observaciones, presupuesto_id, usuario_id, user.sucursal_id, cotizacionMomento
+      formaPagoVenta, observaciones, presupuesto_id, usuario_id, user.sucursal_id, cotizacionMomento, empresaId
     ]);
 
     const ventaId = result.id;
@@ -293,37 +301,37 @@ export const createVenta = async (req, res) => {
       await runQuery(`
         INSERT INTO ventas_detalle (
           venta_id, producto_id, descripcion, cantidad,
-          precio_unitario, descuento_porcentaje, subtotal
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          precio_unitario, descuento_porcentaje, subtotal, empresa_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         ventaId, item.producto_id, item.descripcion,
         item.cantidad, item.precio_unitario,
-        item.descuento_porcentaje || 0, itemTotal
+        item.descuento_porcentaje || 0, itemTotal, empresaId
       ]);
 
       // Obtener stock actual de la sucursal
       const stockSucursal = await getOne(
-        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-        [item.producto_id, user.sucursal_id]
+        'SELECT stock_actual FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+        [empresaId, item.producto_id, user.sucursal_id]
       );
       const stockAnterior = stockSucursal.stock_actual;
       const stockNuevo = stockAnterior - item.cantidad;
 
       // Actualizar stock en la sucursal
       await runQuery(
-        'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
-        [stockNuevo, item.producto_id, user.sucursal_id]
+        'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+        [stockNuevo, empresaId, item.producto_id, user.sucursal_id]
       );
 
       // Registrar movimiento de stock con sucursal_id
       await runQuery(`
         INSERT INTO movimientos_stock (
           producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-          motivo, venta_id, usuario_id, sucursal_id, fecha
-        ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          motivo, venta_id, usuario_id, sucursal_id, fecha, empresa_id
+        ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
       `, [
         item.producto_id, item.cantidad, stockAnterior, stockNuevo,
-        `Venta ${numero_comprobante}`, ventaId, usuario_id, user.sucursal_id
+        `Venta ${numero_comprobante}`, ventaId, usuario_id, user.sucursal_id, empresaId
       ]);
 
       // Actualizar stock total del producto
@@ -333,8 +341,8 @@ export const createVenta = async (req, res) => {
     // Si la venta proviene de un presupuesto, marcarlo como convertido
     if (presupuesto_id) {
       await runQuery(
-        `UPDATE presupuestos SET estado = 'convertido', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [presupuesto_id]
+        `UPDATE presupuestos SET estado = 'convertido', updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?`,
+        [empresaId, presupuesto_id]
       );
     }
 
@@ -344,15 +352,15 @@ export const createVenta = async (req, res) => {
     for (const pago of pagosList) {
       // Insertar detalle del pago
       await runQuery(`
-        INSERT INTO ventas_pagos (venta_id, forma_pago, monto, observaciones)
-        VALUES (?, ?, ?, ?)
-      `, [ventaId, pago.forma_pago, pago.monto, pago.observaciones || null]);
+        INSERT INTO ventas_pagos (venta_id, forma_pago, monto, observaciones, empresa_id)
+        VALUES (?, ?, ?, ?, ?)
+      `, [ventaId, pago.forma_pago, pago.monto, pago.observaciones || null, empresaId]);
 
       // Si es cuenta corriente, registrar movimiento
       if (pago.forma_pago === 'cuenta_corriente') {
         const cliente = await getOne(
-          'SELECT saldo_cuenta_corriente, limite_credito, razon_social FROM clientes WHERE id = ?',
-          [cliente_id]
+          'SELECT saldo_cuenta_corriente, limite_credito, razon_social FROM clientes WHERE empresa_id = ? AND id = ?',
+          [empresaId, cliente_id]
         );
 
         const saldoAnterior = cliente.saldo_cuenta_corriente;
@@ -361,42 +369,42 @@ export const createVenta = async (req, res) => {
         await runQuery(`
           INSERT INTO cuenta_corriente (
             cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
-            concepto, venta_id, fecha, usuario_id
-          ) VALUES (?, 'debito', ?, ?, ?, ?, ?, ?, ?)
+            concepto, venta_id, fecha, usuario_id, empresa_id
+          ) VALUES (?, 'debito', ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           cliente_id, pago.monto, saldoAnterior, saldoNuevo,
-          `Venta ${numero_comprobante}`, ventaId, fecha, usuario_id
+          `Venta ${numero_comprobante}`, ventaId, fecha, usuario_id, empresaId
         ]);
 
         await runQuery(
-          'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
-          [saldoNuevo, cliente_id]
+          'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE empresa_id = ? AND id = ?',
+          [saldoNuevo, empresaId, cliente_id]
         );
       }
 
       // Si es efectivo, registrar en caja abierta
       if (pago.forma_pago === 'efectivo') {
         const cajaAbierta = await getOne(
-          'SELECT id FROM cajas WHERE usuario_apertura_id = ? AND estado = ? ORDER BY fecha_apertura DESC LIMIT 1',
-          [usuario_id, 'abierta']
+          'SELECT id FROM cajas WHERE empresa_id = ? AND usuario_apertura_id = ? AND estado = ? ORDER BY fecha_apertura DESC LIMIT 1',
+          [empresaId, usuario_id, 'abierta']
         );
 
         if (cajaAbierta) {
           await runQuery(`
             INSERT INTO movimientos_caja (
               caja_id, tipo_movimiento, categoria, monto, concepto,
-              venta_id, numero_comprobante, usuario_id
-            ) VALUES (?, 'ingreso', 'venta', ?, ?, ?, ?, ?)
+              venta_id, numero_comprobante, usuario_id, empresa_id
+            ) VALUES (?, 'ingreso', 'venta', ?, ?, ?, ?, ?, ?)
           `, [
             cajaAbierta.id, pago.monto,
-            `Venta ${numero_comprobante}`, ventaId, numero_comprobante, usuario_id
+            `Venta ${numero_comprobante}`, ventaId, numero_comprobante, usuario_id, empresaId
           ]);
 
           await runQuery(`
             UPDATE cajas SET 
               total_ingresos = total_ingresos + ?
-            WHERE id = ?
-          `, [pago.monto, cajaAbierta.id]);
+            WHERE empresa_id = ? AND id = ?
+          `, [pago.monto, empresaId, cajaAbierta.id]);
 
           console.log(`✓ Registrado en caja: Ingreso de $${pago.monto} por venta ${numero_comprobante}`);
         } else {
@@ -421,10 +429,11 @@ export const anularVenta = async (req, res) => {
   try {
     const { id } = req.params;
     const { usuario_id } = req.body;
+    const empresaId = getEmpresaId(req);
 
     const venta = await getOne(
-      'SELECT id, estado, numero_comprobante, cliente_id, total, forma_pago, sucursal_id FROM ventas WHERE id = ?',
-      [id]
+      'SELECT id, estado, numero_comprobante, cliente_id, total, forma_pago, sucursal_id FROM ventas WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     if (!venta) {
@@ -437,15 +446,15 @@ export const anularVenta = async (req, res) => {
 
     // Obtener detalle para devolver stock
     const detalle = await getAll(
-      'SELECT producto_id, cantidad FROM ventas_detalle WHERE venta_id = ?',
-      [id]
+      'SELECT producto_id, cantidad FROM ventas_detalle WHERE empresa_id = ? AND venta_id = ?',
+      [empresaId, id]
     );
 
     // ========== DEVOLVER STOCK A LA SUCURSAL ==========
     for (const item of detalle) {
       const stockSucursal = await getOne(
-        'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-        [item.producto_id, venta.sucursal_id]
+        'SELECT stock_actual FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+        [empresaId, item.producto_id, venta.sucursal_id]
       );
 
       if (stockSucursal) {
@@ -453,19 +462,19 @@ export const anularVenta = async (req, res) => {
         const stockNuevo = stockAnterior + item.cantidad;
 
         await runQuery(
-          'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
-          [stockNuevo, item.producto_id, venta.sucursal_id]
+          'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+          [stockNuevo, empresaId, item.producto_id, venta.sucursal_id]
         );
 
         // Registrar movimiento de stock
         await runQuery(`
           INSERT INTO movimientos_stock (
             producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-            motivo, venta_id, usuario_id, sucursal_id, fecha
-          ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            motivo, venta_id, usuario_id, sucursal_id, fecha, empresa_id
+          ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
         `, [
           item.producto_id, item.cantidad, stockAnterior, stockNuevo,
-          `Anulación venta ${venta.numero_comprobante}`, id, usuario_id, venta.sucursal_id
+          `Anulación venta ${venta.numero_comprobante}`, id, usuario_id, venta.sucursal_id, empresaId
         ]);
 
         // Actualizar stock total del producto
@@ -475,14 +484,14 @@ export const anularVenta = async (req, res) => {
 
     // Revertir pagos en cuenta corriente
     const pagosCC = await getAll(
-      'SELECT * FROM ventas_pagos WHERE venta_id = ? AND forma_pago = ?',
-      [id, 'cuenta_corriente']
+      'SELECT * FROM ventas_pagos WHERE empresa_id = ? AND venta_id = ? AND forma_pago = ?',
+      [empresaId, id, 'cuenta_corriente']
     );
 
     for (const pago of pagosCC) {
       const cliente = await getOne(
-        'SELECT id, razon_social, saldo_cuenta_corriente FROM clientes WHERE id = ?',
-        [venta.cliente_id]
+        'SELECT id, razon_social, saldo_cuenta_corriente FROM clientes WHERE empresa_id = ? AND id = ?',
+        [empresaId, venta.cliente_id]
       );
 
       const saldoAnterior = cliente.saldo_cuenta_corriente;
@@ -491,53 +500,53 @@ export const anularVenta = async (req, res) => {
       await runQuery(`
         INSERT INTO cuenta_corriente (
           cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
-          concepto, venta_id, fecha, usuario_id
-        ) VALUES (?, 'credito', ?, ?, ?, ?, ?, CURRENT_DATE, ?)
+          concepto, venta_id, fecha, usuario_id, empresa_id
+        ) VALUES (?, 'credito', ?, ?, ?, ?, ?, CURRENT_DATE, ?, ?)
       `, [
         venta.cliente_id, pago.monto, saldoAnterior, saldoNuevo,
-        `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
+        `Anulación venta ${venta.numero_comprobante}`, id, usuario_id, empresaId
       ]);
 
       await runQuery(
-        'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
-        [saldoNuevo, venta.cliente_id]
+        'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE empresa_id = ? AND id = ?',
+        [saldoNuevo, empresaId, venta.cliente_id]
       );
     }
 
     // Revertir pagos en efectivo de la caja
     const pagosEfectivo = await getAll(
-      'SELECT * FROM ventas_pagos WHERE venta_id = ? AND forma_pago = ?',
-      [id, 'efectivo']
+      'SELECT * FROM ventas_pagos WHERE empresa_id = ? AND venta_id = ? AND forma_pago = ?',
+      [empresaId, id, 'efectivo']
     );
 
     for (const pago of pagosEfectivo) {
       const movimientoCaja = await getOne(
-        'SELECT caja_id, monto FROM movimientos_caja WHERE venta_id = ? AND tipo_movimiento = ?',
-        [id, 'ingreso']
+        'SELECT caja_id, monto FROM movimientos_caja WHERE empresa_id = ? AND venta_id = ? AND tipo_movimiento = ?',
+        [empresaId, id, 'ingreso']
       );
 
       if (movimientoCaja) {
         const caja = await getOne(
-          'SELECT estado FROM cajas WHERE id = ?',
-          [movimientoCaja.caja_id]
+          'SELECT estado FROM cajas WHERE empresa_id = ? AND id = ?',
+          [empresaId, movimientoCaja.caja_id]
         );
 
         if (caja && caja.estado === 'abierta') {
           await runQuery(`
             INSERT INTO movimientos_caja (
               caja_id, tipo_movimiento, categoria, monto, concepto,
-              venta_id, usuario_id
-            ) VALUES (?, 'egreso', 'devolucion', ?, ?, ?, ?)
+              venta_id, usuario_id, empresa_id
+            ) VALUES (?, 'egreso', 'devolucion', ?, ?, ?, ?, ?)
           `, [
             movimientoCaja.caja_id, pago.monto,
-            `Anulación venta ${venta.numero_comprobante}`, id, usuario_id
+            `Anulación venta ${venta.numero_comprobante}`, id, usuario_id, empresaId
           ]);
 
           await runQuery(`
             UPDATE cajas SET 
               total_egresos = total_egresos + ?
-            WHERE id = ?
-          `, [pago.monto, movimientoCaja.caja_id]);
+            WHERE empresa_id = ? AND id = ?
+          `, [pago.monto, empresaId, movimientoCaja.caja_id]);
 
           console.log(`✓ Revertido en caja: Egreso de $${pago.monto} por anulación de venta`);
         } else {
@@ -548,8 +557,8 @@ export const anularVenta = async (req, res) => {
 
     // Marcar venta como anulada
     await runQuery(
-      'UPDATE ventas SET estado = \'anulada\', updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [id]
+      'UPDATE ventas SET estado = \'anulada\', updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     const tienePagosCC = pagosCC.length > 0;

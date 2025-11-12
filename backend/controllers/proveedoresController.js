@@ -1,18 +1,20 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todos los proveedores (con búsqueda y filtros)
 export const getProveedores = async (req, res) => {
   try {
     const { search, activo } = req.query;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT p.*, 
-             (SELECT COUNT(*) FROM proveedores_contactos WHERE proveedor_id = p.id) as contactos_count,
-             (SELECT COUNT(*) FROM productos WHERE proveedor_id = p.id) as productos_count
+             (SELECT COUNT(*) FROM proveedores_contactos pc WHERE pc.empresa_id = p.empresa_id AND pc.proveedor_id = p.id) as contactos_count,
+             (SELECT COUNT(*) FROM productos pr WHERE pr.empresa_id = p.empresa_id AND pr.proveedor_id = p.id) as productos_count
       FROM proveedores p
-      WHERE 1=1
+      WHERE p.empresa_id = ?
     `;
-    const params = [];
+    const params = [empresaId];
 
     // Búsqueda por texto
     if (search) {
@@ -41,10 +43,11 @@ export const getProveedores = async (req, res) => {
 export const getProveedorById = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const proveedor = await getOne(
-      'SELECT * FROM proveedores WHERE id = ?',
-      [id]
+      'SELECT * FROM proveedores WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     if (!proveedor) {
@@ -53,14 +56,14 @@ export const getProveedorById = async (req, res) => {
 
     // Obtener contactos del proveedor
     const contactos = await getAll(
-      'SELECT * FROM proveedores_contactos WHERE proveedor_id = ? ORDER BY principal DESC, nombre ASC',
-      [id]
+      'SELECT * FROM proveedores_contactos WHERE empresa_id = ? AND proveedor_id = ? ORDER BY principal DESC, nombre ASC',
+      [empresaId, id]
     );
 
     // Obtener productos del proveedor
     const productos = await getAll(
-      'SELECT id, codigo, descripcion, stock_actual FROM productos WHERE proveedor_id = ? ORDER BY descripcion ASC',
-      [id]
+      'SELECT id, codigo, descripcion, stock_actual FROM productos WHERE empresa_id = ? AND proveedor_id = ? ORDER BY descripcion ASC',
+      [empresaId, id]
     );
 
     res.json({ proveedor: { ...proveedor, contactos, productos } });
@@ -88,6 +91,7 @@ export const createProveedor = async (req, res) => {
       condicion_pago,
       observaciones,
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Validaciones
     if (!razon_social) {
@@ -99,8 +103,8 @@ export const createProveedor = async (req, res) => {
     // Verificar si el CUIT/DNI ya existe (si se proporciona)
     if (cuit_dni) {
       const existing = await getOne(
-        'SELECT id FROM proveedores WHERE cuit_dni = ?',
-        [cuit_dni]
+        'SELECT id FROM proveedores WHERE empresa_id = ? AND cuit_dni = ?',
+        [empresaId, cuit_dni]
       );
 
       if (existing) {
@@ -114,12 +118,12 @@ export const createProveedor = async (req, res) => {
       `INSERT INTO proveedores (
         razon_social, nombre_fantasia, cuit_dni, telefono, email,
         direccion, pais, localidad, provincia, codigo_postal, sitio_web,
-        condicion_pago, observaciones, activo
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        condicion_pago, observaciones, activo, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
       [
         razon_social, nombre_fantasia, cuit_dni, telefono, email,
         direccion, pais || 'AR', localidad, provincia, codigo_postal, sitio_web,
-        condicion_pago || 'cuenta_corriente', observaciones
+        condicion_pago || 'cuenta_corriente', observaciones, empresaId
       ]
     );
 
@@ -153,9 +157,10 @@ export const updateProveedor = async (req, res) => {
       observaciones,
       activo,
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Verificar que el proveedor existe
-    const proveedor = await getOne('SELECT id FROM proveedores WHERE id = ?', [id]);
+    const proveedor = await getOne('SELECT id FROM proveedores WHERE empresa_id = ? AND id = ?', [empresaId, id]);
     if (!proveedor) {
       return res.status(404).json({ error: 'Proveedor no encontrado' });
     }
@@ -163,8 +168,8 @@ export const updateProveedor = async (req, res) => {
     // Verificar si el CUIT/DNI ya existe en otro proveedor
     if (cuit_dni) {
       const existing = await getOne(
-        'SELECT id FROM proveedores WHERE cuit_dni = ? AND id != ?',
-        [cuit_dni, id]
+        'SELECT id FROM proveedores WHERE empresa_id = ? AND cuit_dni = ? AND id != ?',
+        [empresaId, cuit_dni, id]
       );
 
       if (existing) {
@@ -181,11 +186,12 @@ export const updateProveedor = async (req, res) => {
         provincia = ?, codigo_postal = ?, sitio_web = ?,
         condicion_pago = ?, observaciones = ?, activo = ?,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?`,
+      WHERE empresa_id = ? 
+      AND id = ?`,
       [
         razon_social, nombre_fantasia, cuit_dni, telefono, email,
         direccion, pais, localidad, provincia, codigo_postal, sitio_web,
-        condicion_pago, observaciones, activo !== undefined ? activo : 1, id
+        condicion_pago, observaciones, activo !== undefined ? activo : 1, empresaId, id
       ]
     );
 
@@ -200,17 +206,18 @@ export const updateProveedor = async (req, res) => {
 export const deleteProveedor = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     // Verificar que el proveedor existe
-    const proveedor = await getOne('SELECT id FROM proveedores WHERE id = ?', [id]);
+    const proveedor = await getOne('SELECT id FROM proveedores WHERE empresa_id = ? AND id = ?', [empresaId, id]);
     if (!proveedor) {
       return res.status(404).json({ error: 'Proveedor no encontrado' });
     }
 
     // Verificar si tiene compras asociadas
     const compras = await getOne(
-      'SELECT COUNT(*) as count FROM compras WHERE proveedor_id = ?',
-      [id]
+      'SELECT COUNT(*) as count FROM compras WHERE empresa_id = ? AND proveedor_id = ?',
+      [empresaId, id]
     );
 
     if (compras.count > 0) {
@@ -221,8 +228,8 @@ export const deleteProveedor = async (req, res) => {
 
     // Verificar si tiene productos asociados
     const productos = await getOne(
-      'SELECT COUNT(*) as count FROM productos WHERE proveedor_id = ?',
-      [id]
+      'SELECT COUNT(*) as count FROM productos WHERE empresa_id = ? AND proveedor_id = ?',
+      [empresaId, id]
     );
 
     if (productos.count > 0) {
@@ -233,8 +240,8 @@ export const deleteProveedor = async (req, res) => {
 
     // Soft delete
     await runQuery(
-      'UPDATE proveedores SET activo = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [id]
+      'UPDATE proveedores SET activo = 0, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+      [empresaId, id]
     );
 
     res.json({ message: 'Proveedor eliminado exitosamente' });
@@ -249,9 +256,10 @@ export const addContacto = async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre, cargo, telefono, email, principal } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Verificar que el proveedor existe
-    const proveedor = await getOne('SELECT id FROM proveedores WHERE id = ?', [id]);
+    const proveedor = await getOne('SELECT id FROM proveedores WHERE empresa_id = ? AND id = ?', [empresaId, id]);
     if (!proveedor) {
       return res.status(404).json({ error: 'Proveedor no encontrado' });
     }
@@ -259,15 +267,15 @@ export const addContacto = async (req, res) => {
     // Si se marca como principal, desmarcar otros contactos principales
     if (principal) {
       await runQuery(
-        'UPDATE proveedores_contactos SET principal = 0 WHERE proveedor_id = ?',
-        [id]
+        'UPDATE proveedores_contactos SET principal = 0 WHERE empresa_id = ? AND proveedor_id = ?',
+        [empresaId, id]
       );
     }
 
     const result = await runQuery(
-      `INSERT INTO proveedores_contactos (proveedor_id, nombre, cargo, telefono, email, principal)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, nombre, cargo, telefono, email, principal ? 1 : 0]
+      `INSERT INTO proveedores_contactos (proveedor_id, nombre, cargo, telefono, email, principal, empresa_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, nombre, cargo, telefono, email, principal ? 1 : 0, empresaId]
     );
 
     res.status(201).json({
@@ -284,8 +292,9 @@ export const addContacto = async (req, res) => {
 export const deleteContacto = async (req, res) => {
   try {
     const { contactoId } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    await runQuery('DELETE FROM proveedores_contactos WHERE id = ?', [contactoId]);
+    await runQuery('DELETE FROM proveedores_contactos WHERE empresa_id = ? AND id = ?', [empresaId, contactoId]);
 
     res.json({ message: 'Contacto eliminado exitosamente' });
   } catch (error) {

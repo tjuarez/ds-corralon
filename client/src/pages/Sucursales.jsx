@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { sucursalesApi } from '../api/sucursales';
@@ -114,7 +115,7 @@ const Sucursales = () => {
           <p style={styles.subtitle}>Gestión de sucursales del negocio</p>
         </div>
         <button
-          onClick={() => navigate('/sucursales/nueva')}
+          onClick={() => navigate(buildTenantPath('/sucursales/nueva'))}
           style={styles.addButton}
         >
           <Plus size={18} style={{ marginRight: '6px' }} />
@@ -275,7 +276,7 @@ const Sucursales = () => {
 
               <div style={styles.cardActions}>
                 <button
-                  onClick={() => navigate(`/sucursales/${sucursal.id}/editar`)}
+                  onClick={() => navigate(buildTenantPath(`/sucursales/${sucursal.id}/editar`))}
                   style={styles.editButton}
                   title="Editar"
                 >

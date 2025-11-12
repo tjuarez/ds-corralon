@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -34,13 +35,13 @@ const RegistrarMovimientoCaja = () => {
       const data = await cajaApi.getById(id);
       if (data.caja.estado !== 'abierta') {
         showError('La caja está cerrada');
-        navigate('/caja');
+        navigate(buildTenantPath('/caja'));
         return;
       }
       setCaja(data.caja);
     } catch (error) {
       showError(error.message);
-      navigate('/caja');
+      navigate(buildTenantPath('/caja'));
     }
   };
 
@@ -81,7 +82,7 @@ const RegistrarMovimientoCaja = () => {
 
       await cajaApi.registrarMovimiento(dataToSend);
       showSuccess('Movimiento registrado exitosamente');
-      navigate(`/caja/${id}`);
+      navigate(buildTenantPath(`/caja/${id}`));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -108,7 +109,7 @@ const RegistrarMovimientoCaja = () => {
           <p style={styles.subtitle}>Caja N° {caja.numero}</p>
         </div>
         <button
-          onClick={() => navigate(`/caja/${id}`)}
+          onClick={() => navigate(buildTenantPath(`/caja/${id}`))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -269,7 +270,7 @@ const RegistrarMovimientoCaja = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate(`/caja/${id}`)}
+            onClick={() => navigate(buildTenantPath(`/caja/${id}`))}
             style={styles.cancelButton}
             disabled={loading}
           >

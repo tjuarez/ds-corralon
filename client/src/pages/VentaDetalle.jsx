@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -42,7 +43,7 @@ const VentaDetalle = () => {
       setVenta(data.venta);
     } catch (error) {
       showError(error.message);
-      navigate('/ventas');
+      navigate(buildTenantPath('/ventas'));
     } finally {
       setLoading(false);
     }
@@ -148,7 +149,7 @@ const VentaDetalle = () => {
           <p style={styles.subtitle}>Detalles completos de la venta</p>
         </div>
         <div style={styles.headerActions}>
-          <button onClick={() => navigate('/ventas')} style={styles.backButton}>
+          <button onClick={() => navigate(buildTenantPath('/ventas'))} style={styles.backButton}>
             <ArrowLeft size={18} style={{ marginRight: '6px' }} />
             Volver
           </button>

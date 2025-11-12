@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { cuentaCorrienteApi } from '../api/cuentaCorriente';
@@ -222,7 +223,7 @@ const CuentaCorriente = () => {
 
                 <div style={styles.cardFooter}>
                   <button
-                    onClick={() => navigate(`/cuenta-corriente/${cliente.id}`)}
+                    onClick={() => navigate(buildTenantPath(`/cuenta-corriente/${cliente.id}`))}
                     style={styles.viewButton}
                   >
                     <Eye size={16} style={{ marginRight: '6px' }} />

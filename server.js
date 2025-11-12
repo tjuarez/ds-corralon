@@ -6,6 +6,8 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import { tenantMiddleware, checkTenantAccess } from './backend/middleware/tenant.js';
+import { authMiddleware } from './backend/middleware/auth.js';
 import authRoutes from './backend/routes/auth.js';
 import clientesRoutes from './backend/routes/clientes.js';
 import categoriasRoutes from './backend/routes/categorias.js';
@@ -53,24 +55,37 @@ if (process.env.NODE_ENV === 'development') {
 // Servir archivos estáticos (uploads, imágenes de productos, etc.)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// API Routes 
+// Ruta de salud (sin tenant)
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'DS-Corralón API funcionando correctamente',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ========== RUTAS PÚBLICAS (SIN TENANT) ==========
 app.use('/api/auth', authRoutes);
-app.use('/api/clientes', clientesRoutes);
-app.use('/api/categorias', categoriasRoutes);
-app.use('/api/productos', productosRoutes);
-app.use('/api/proveedores', proveedoresRoutes);
-app.use('/api/presupuestos', presupuestosRoutes);
-app.use('/api/ventas', ventasRoutes);
-app.use('/api/compras', comprasRoutes);
-app.use('/api/cuenta-corriente', cuentaCorrienteRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/caja', cajaRoutes);
-app.use('/api/reportes', reportesRoutes);
-app.use('/api/sucursales', sucursalesRoutes);
-app.use('/api/usuarios', usuariosRoutes);
-app.use('/api/stock-sucursales', stockSucursalesRoutes);
-app.use('/api/configuracion', configuracionRoutes);
-app.use('/api/movimientos-stock', movimientosStockRoutes);
+
+// ========== RUTAS CON TENANT ==========
+// Todas las rutas con /:tenant/ requieren validación de tenant y autenticación
+
+app.use('/api/:tenant/clientes', tenantMiddleware, authMiddleware, checkTenantAccess, clientesRoutes);
+app.use('/api/:tenant/categorias', tenantMiddleware, authMiddleware, checkTenantAccess, categoriasRoutes);
+app.use('/api/:tenant/productos', tenantMiddleware, authMiddleware, checkTenantAccess, productosRoutes);
+app.use('/api/:tenant/proveedores', tenantMiddleware, authMiddleware, checkTenantAccess, proveedoresRoutes);
+app.use('/api/:tenant/presupuestos', tenantMiddleware, authMiddleware, checkTenantAccess, presupuestosRoutes);
+app.use('/api/:tenant/ventas', tenantMiddleware, authMiddleware, checkTenantAccess, ventasRoutes);
+app.use('/api/:tenant/compras', tenantMiddleware, authMiddleware, checkTenantAccess, comprasRoutes);
+app.use('/api/:tenant/cuenta-corriente', tenantMiddleware, authMiddleware, checkTenantAccess, cuentaCorrienteRoutes);
+app.use('/api/:tenant/upload', tenantMiddleware, authMiddleware, checkTenantAccess, uploadRoutes);
+app.use('/api/:tenant/caja', tenantMiddleware, authMiddleware, checkTenantAccess, cajaRoutes);
+app.use('/api/:tenant/reportes', tenantMiddleware, authMiddleware, checkTenantAccess, reportesRoutes);
+app.use('/api/:tenant/sucursales', tenantMiddleware, authMiddleware, checkTenantAccess, sucursalesRoutes);
+app.use('/api/:tenant/usuarios', tenantMiddleware, authMiddleware, checkTenantAccess, usuariosRoutes);
+app.use('/api/:tenant/stock-sucursales', tenantMiddleware, authMiddleware, checkTenantAccess, stockSucursalesRoutes);
+app.use('/api/:tenant/configuracion', tenantMiddleware, authMiddleware, checkTenantAccess, configuracionRoutes);
+app.use('/api/:tenant/movimientos-stock', tenantMiddleware, authMiddleware, checkTenantAccess, movimientosStockRoutes);
 
 // En producción, servir el frontend compilado
 if (process.env.NODE_ENV === 'production') {
@@ -80,15 +95,6 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, 'client/dist/index.html'));
   });
 }
-
-// Ruta de salud para verificar que el servidor está funcionando
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'DS-Corralón API funcionando correctamente',
-    timestamp: new Date().toISOString()
-  });
-});
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
@@ -105,4 +111,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor DS-Corralón ejecutándose en http://localhost:${PORT}`);
   console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🏢 Multi-tenant: Activado`);
 });

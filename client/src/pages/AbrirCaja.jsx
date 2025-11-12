@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -46,7 +47,7 @@ const AbrirCaja = () => {
 
       const result = await cajaApi.abrirCaja(dataToSend);
       showSuccess(`Caja N° ${result.numero} abierta exitosamente`);
-      navigate('/caja');
+      navigate(buildTenantPath('/caja'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -62,7 +63,7 @@ const AbrirCaja = () => {
           <p style={styles.subtitle}>Iniciar un nuevo turno de caja</p>
         </div>
         <button
-          onClick={() => navigate('/caja')}
+          onClick={() => navigate(buildTenantPath('/caja'))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -129,7 +130,7 @@ const AbrirCaja = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate('/caja')}
+            onClick={() => navigate(buildTenantPath('/caja'))}
             style={styles.cancelButton}
             disabled={loading}
           >

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { clientesApi } from '../api/clientes';
 import Layout from '../components/Layout';
@@ -80,7 +81,7 @@ const Clientes = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/clientes/nuevo')}
+          onClick={() => navigate(buildTenantPath('/clientes/nuevo'))}
           style={styles.addButton}
         >
           <Plus size={18} style={{ marginRight: '6px' }} />
@@ -123,7 +124,7 @@ const Clientes = () => {
         <div style={styles.noData}>
           <p style={styles.noDataText}>{t('noData')}</p>
           <button
-            onClick={() => navigate('/clientes/nuevo')}
+            onClick={() => navigate(buildTenantPath('/clientes/nuevo'))}
             style={styles.addButtonSecondary}
           >
             Crear primer cliente
@@ -189,14 +190,14 @@ const Clientes = () => {
 
               <div style={styles.cardFooter}>
                 <button
-                  onClick={() => navigate(`/clientes/${cliente.id}`)}
+                  onClick={() => navigate(buildTenantPath(`/clientes/${cliente.id}`))}
                   style={styles.viewButton}
                 >
                   <Eye size={16} style={{ marginRight: '6px' }} />
                   Ver
                 </button>
                 <button
-                  onClick={() => navigate(`/clientes/${cliente.id}/editar`)}
+                  onClick={() => navigate(buildTenantPath(`/clientes/${cliente.id}/editar`))}
                   style={styles.editButton}
                 >
                   <Edit size={16} style={{ marginRight: '6px' }} />

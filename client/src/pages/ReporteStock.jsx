@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -116,7 +117,7 @@ const ReporteStock = () => {
           <h1 style={styles.title}>{t('stockReport')}</h1>
           <p style={styles.subtitle}>Estado actual del inventario por sucursal</p>
         </div>
-        <button onClick={() => navigate('/dashboard')} style={styles.backButton}>
+        <button onClick={() => navigate(buildTenantPath('/dashboard'))} style={styles.backButton}>
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
           {t('back')}
         </button>

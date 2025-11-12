@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { usuariosApi } from '../api/usuarios';
@@ -132,7 +133,7 @@ const Usuarios = () => {
           <p style={styles.subtitle}>Gestión de usuarios del sistema</p>
         </div>
         <button
-          onClick={() => navigate('/usuarios/nuevo')}
+          onClick={() => navigate(buildTenantPath('/usuarios/nuevo'))}
           style={styles.addButton}
         >
           <Plus size={18} style={{ marginRight: '6px' }} />
@@ -320,7 +321,7 @@ const Usuarios = () => {
 
                 <div style={styles.cardActions}>
                   <button
-                    onClick={() => navigate(`/usuarios/${usuario.id}/editar`)}
+                    onClick={() => navigate(buildTenantPath(`/usuarios/${usuario.id}/editar`))}
                     style={styles.editButton}
                     title="Editar"
                   >

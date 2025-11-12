@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { buildTenantPath } from '../utils/tenantHelper';
 import { useLanguage } from '../context/LanguageContext';
 import { useNotification } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -110,7 +111,7 @@ const PresupuestoForm = () => {
       }
     } catch (error) {
       showError(error.message);
-      navigate('/presupuestos');
+      navigate(buildTenantPath('/presupuestos'));
     } finally {
       setLoadingData(false);
     }
@@ -274,7 +275,7 @@ const PresupuestoForm = () => {
         showSuccess(`Presupuesto ${result.numero} creado exitosamente`);
       }
 
-      navigate('/presupuestos');
+      navigate(buildTenantPath('/presupuestos'));
     } catch (error) {
       showError(error.message);
     } finally {
@@ -313,7 +314,7 @@ const PresupuestoForm = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate('/presupuestos')}
+          onClick={() => navigate(buildTenantPath('/presupuestos'))}
           style={styles.backButton}
         >
           <ArrowLeft size={18} style={{ marginRight: '6px' }} />
@@ -598,7 +599,7 @@ const PresupuestoForm = () => {
         <div style={styles.actions}>
           <button
             type="button"
-            onClick={() => navigate('/presupuestos')}
+            onClick={() => navigate(buildTenantPath('/presupuestos'))}
             style={styles.cancelButton}
             disabled={loading}
           >

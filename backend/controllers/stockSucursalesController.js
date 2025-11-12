@@ -1,9 +1,11 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener stock de un producto en todas las sucursales
 export const getStockProducto = async (req, res) => {
   try {
     const { producto_id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const stocks = await getAll(`
       SELECT ss.*,
@@ -12,11 +14,12 @@ export const getStockProducto = async (req, res) => {
              p.codigo as producto_codigo,
              p.descripcion as producto_descripcion
       FROM stock_sucursales ss
-      LEFT JOIN sucursales s ON ss.sucursal_id = s.id
-      LEFT JOIN productos p ON ss.producto_id = p.id
-      WHERE ss.producto_id = ?
+      LEFT JOIN sucursales s ON ss.empresa_id = s.empresa_id AND ss.sucursal_id = s.id
+      LEFT JOIN productos p ON ss.empresa_id = p.empresa_id AND ss.producto_id = p.id
+      WHERE ss.empresa_id = ?
+      AND ss.producto_id = ?
       ORDER BY s.nombre ASC
-    `, [producto_id]);
+    `, [empresaId, producto_id]);
 
     res.json({ stocks });
   } catch (error) {
@@ -30,6 +33,7 @@ export const getStockSucursal = async (req, res) => {
   try {
     const { sucursal_id } = req.params;
     const { categoria_id, buscar, bajo_minimo } = req.query;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT ss.*,
@@ -39,11 +43,12 @@ export const getStockSucursal = async (req, res) => {
              p.precio_costo,
              c.nombre as categoria_nombre
       FROM stock_sucursales ss
-      LEFT JOIN productos p ON ss.producto_id = p.id
-      LEFT JOIN categorias c ON p.categoria_id = c.id
-      WHERE ss.sucursal_id = ?
+      LEFT JOIN productos p ON ss.empresa_id = p.empresa_id AND ss.producto_id = p.id
+      LEFT JOIN categorias c ON ss.empresa_id = c.empresa_id AND p.categoria_id = c.id
+      WHERE ss.empresa_id = ?
+      AND ss.sucursal_id = ?
     `;
-    const params = [sucursal_id];
+    const params = [empresaId, sucursal_id];
 
     if (categoria_id) {
       sql += ' AND p.categoria_id = ?';
@@ -74,6 +79,7 @@ export const getStockSucursal = async (req, res) => {
 export const inicializarStock = async (req, res) => {
   try {
     const { producto_id, sucursal_id, stock_inicial, stock_minimo, stock_maximo } = req.body;
+    const empresaId = getEmpresaId(req);
 
     if (!producto_id || !sucursal_id) {
       return res.status(400).json({ error: 'Producto y sucursal son obligatorios' });
@@ -81,8 +87,8 @@ export const inicializarStock = async (req, res) => {
 
     // Verificar si ya existe
     const existe = await getOne(
-      'SELECT id FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-      [producto_id, sucursal_id]
+      'SELECT id FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+      [empresaId, producto_id, sucursal_id]
     );
 
     if (existe) {
@@ -91,9 +97,9 @@ export const inicializarStock = async (req, res) => {
 
     await runQuery(`
       INSERT INTO stock_sucursales (
-        producto_id, sucursal_id, stock_actual, stock_minimo, stock_maximo
-      ) VALUES (?, ?, ?, ?, ?)
-    `, [producto_id, sucursal_id, stock_inicial || 0, stock_minimo || 0, stock_maximo || 0]);
+        producto_id, sucursal_id, stock_actual, stock_minimo, stock_maximo, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `, [producto_id, sucursal_id, stock_inicial || 0, stock_minimo || 0, stock_maximo || 0, empresaId]);
 
     res.status(201).json({ message: 'Stock inicializado correctamente' });
   } catch (error) {
@@ -106,6 +112,7 @@ export const inicializarStock = async (req, res) => {
 export const ajustarStock = async (req, res) => {
   try {
     const { producto_id, sucursal_id, cantidad, motivo, usuario_id } = req.body;
+    const empresaId = getEmpresaId(req);
 
     if (!producto_id || !sucursal_id || cantidad === undefined || !motivo) {
       return res.status(400).json({ error: 'Todos los campos son obligatorios' });
@@ -113,8 +120,8 @@ export const ajustarStock = async (req, res) => {
 
     // Obtener stock actual
     const stockActual = await getOne(
-      'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-      [producto_id, sucursal_id]
+      'SELECT stock_actual FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+      [empresaId, producto_id, sucursal_id]
     );
 
     if (!stockActual) {
@@ -130,8 +137,8 @@ export const ajustarStock = async (req, res) => {
 
     // Actualizar stock en sucursal
     await runQuery(
-      'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
-      [stockNuevo, producto_id, sucursal_id]
+      'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+      [stockNuevo, empresaId, producto_id, sucursal_id]
     );
 
     // Registrar movimiento
@@ -139,11 +146,11 @@ export const ajustarStock = async (req, res) => {
     await runQuery(`
       INSERT INTO movimientos_stock (
         producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-        motivo, usuario_id, sucursal_id, fecha
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        motivo, usuario_id, sucursal_id, fecha, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
     `, [
       producto_id, tipoMovimiento, Math.abs(cantidad), stockAnterior, stockNuevo,
-      motivo, usuario_id, sucursal_id
+      motivo, usuario_id, sucursal_id, empresaId
     ]);
 
     // Actualizar stock total del producto
@@ -160,6 +167,7 @@ export const ajustarStock = async (req, res) => {
 export const transferirStock = async (req, res) => {
   try {
     const { producto_id, sucursal_origen_id, sucursal_destino_id, cantidad, motivo, usuario_id } = req.body;
+    const empresaId = getEmpresaId(req);
 
     if (!producto_id || !sucursal_origen_id || !sucursal_destino_id || !cantidad || !motivo) {
       return res.status(400).json({ error: 'Todos los campos son obligatorios' });
@@ -171,8 +179,8 @@ export const transferirStock = async (req, res) => {
 
     // Verificar stock origen
     const stockOrigen = await getOne(
-      'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-      [producto_id, sucursal_origen_id]
+      'SELECT stock_actual FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+      [empresaId, producto_id, sucursal_origen_id]
     );
 
     if (!stockOrigen) {
@@ -185,16 +193,16 @@ export const transferirStock = async (req, res) => {
 
     // Verificar/crear stock destino
     let stockDestino = await getOne(
-      'SELECT stock_actual FROM stock_sucursales WHERE producto_id = ? AND sucursal_id = ?',
-      [producto_id, sucursal_destino_id]
+      'SELECT stock_actual FROM stock_sucursales WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+      [empresaId, producto_id, sucursal_destino_id]
     );
 
     if (!stockDestino) {
       // Crear registro si no existe
       await runQuery(`
-        INSERT INTO stock_sucursales (producto_id, sucursal_id, stock_actual)
-        VALUES (?, ?, 0)
-      `, [producto_id, sucursal_destino_id]);
+        INSERT INTO stock_sucursales (producto_id, sucursal_id, stock_actual, empresa_id)
+        VALUES (?, ?, 0, ?)
+      `, [producto_id, sucursal_destino_id, empresaId]);
       stockDestino = { stock_actual: 0 };
     }
 
@@ -204,36 +212,36 @@ export const transferirStock = async (req, res) => {
 
     // Actualizar origen
     await runQuery(
-      'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
-      [nuevoStockOrigen, producto_id, sucursal_origen_id]
+      'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+      [nuevoStockOrigen, empresaId, producto_id, sucursal_origen_id]
     );
 
     // Actualizar destino
     await runQuery(
-      'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE producto_id = ? AND sucursal_id = ?',
-      [nuevoStockDestino, producto_id, sucursal_destino_id]
+      'UPDATE stock_sucursales SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND producto_id = ? AND sucursal_id = ?',
+      [nuevoStockDestino, empresaId, producto_id, sucursal_destino_id]
     );
 
     // Registrar movimiento origen (salida)
     await runQuery(`
       INSERT INTO movimientos_stock (
         producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-        motivo, usuario_id, sucursal_id, fecha
-      ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        motivo, usuario_id, sucursal_id, fecha, empresa_id
+      ) VALUES (?, 'salida', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
     `, [
       producto_id, cantidad, stockOrigen.stock_actual, nuevoStockOrigen,
-      `Transferencia a sucursal destino: ${motivo}`, usuario_id, sucursal_origen_id
+      `Transferencia a sucursal destino: ${motivo}`, usuario_id, sucursal_origen_id, empresaId
     ]);
 
     // Registrar movimiento destino (entrada)
     await runQuery(`
       INSERT INTO movimientos_stock (
         producto_id, tipo_movimiento, cantidad, stock_anterior, stock_nuevo,
-        motivo, usuario_id, sucursal_id, fecha
-      ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        motivo, usuario_id, sucursal_id, fecha, empresa_id
+      ) VALUES (?, 'entrada', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
     `, [
       producto_id, cantidad, stockDestino.stock_actual, nuevoStockDestino,
-      `Transferencia desde sucursal origen: ${motivo}`, usuario_id, sucursal_destino_id
+      `Transferencia desde sucursal origen: ${motivo}`, usuario_id, sucursal_destino_id, empresaId
     ]);
 
     res.json({ 
@@ -249,15 +257,17 @@ export const transferirStock = async (req, res) => {
 
 // Función auxiliar para actualizar stock total del producto
 const actualizarStockTotal = async (producto_id) => {
+  const empresaId = getEmpresaId(req);
   const resultado = await getOne(`
     SELECT COALESCE(SUM(stock_actual), 0) as stock_total
     FROM stock_sucursales
-    WHERE producto_id = ?
-  `, [producto_id]);
+    WHERE empresa_id = ?
+    AND producto_id = ?
+  `, [empresaId, producto_id]);
 
   await runQuery(
-    'UPDATE productos SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [resultado.stock_total, producto_id]
+    'UPDATE productos SET stock_actual = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+    [resultado.stock_total, empresaId, producto_id]
   );
 };
 

@@ -1,17 +1,20 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener clientes con cuenta corriente
 export const getClientesConCC = async (req, res) => {
   try {
     const { search, con_saldo } = req.query;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT c.*,
-             (SELECT COUNT(*) FROM cuenta_corriente cc WHERE cc.cliente_id = c.id) as cantidad_movimientos
+             (SELECT COUNT(*) FROM cuenta_corriente cc WHERE cc.empresa_id = c.empresa_id AND cc.cliente_id = c.id) as cantidad_movimientos
       FROM clientes c
-      WHERE c.activo = 1
+      WHERE c.empresa_id = ?
+      AND c.activo = 1
     `;
-    const params = [];
+    const params = [empresaId];
 
     // Búsqueda por razón social o CUIT
     if (search) {
@@ -40,15 +43,17 @@ export const getEstadoCuenta = async (req, res) => {
   try {
     const { clienteId } = req.params;
     const { fecha_desde, fecha_hasta } = req.query;
+    const empresaId = getEmpresaId(req);
 
     // Obtener información del cliente
     const cliente = await getOne(`
       SELECT c.*,
-             (SELECT SUM(monto) FROM cuenta_corriente WHERE cliente_id = c.id AND tipo_movimiento = 'debito') as total_debitos,
-             (SELECT SUM(monto) FROM cuenta_corriente WHERE cliente_id = c.id AND tipo_movimiento = 'credito') as total_creditos
+             (SELECT SUM(cc1.monto) FROM cuenta_corriente cc1 WHERE c.empresa_id = cc1.empresa_id AND cc1.cliente_id = c.id AND cc1.tipo_movimiento = 'debito') as total_debitos,
+             (SELECT SUM(cc2.monto) FROM cuenta_corriente cc2 WHERE c.empresa_id = cc2.empresa_id AND cc2.cliente_id = c.id AND cc2.tipo_movimiento = 'credito') as total_creditos
       FROM clientes c
-      WHERE c.id = ?
-    `, [clienteId]);
+      WHERE c.empresa_id = ?
+      AND c.id = ?
+    `, [empresaId, clienteId]);
 
     if (!cliente) {
       return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -59,10 +64,11 @@ export const getEstadoCuenta = async (req, res) => {
       SELECT cc.*,
              u.nombre || ' ' || u.apellido as usuario_nombre
       FROM cuenta_corriente cc
-      LEFT JOIN usuarios u ON cc.usuario_id = u.id
-      WHERE cc.cliente_id = ?
+      LEFT JOIN usuarios u ON cc.empresa_id = u.empresa_id AND cc.usuario_id = u.id
+      WHERE cc.empresa_id = ?
+      AND cc.cliente_id = ?
     `;
-    const params = [clienteId];
+    const params = [empresaId, clienteId];
 
     if (fecha_desde) {
       sql += ` AND cc.fecha >= ?`;
@@ -99,6 +105,7 @@ export const registrarPago = async (req, res) => {
       observaciones,
       usuario_id
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Validaciones
     if (!cliente_id || !monto || !fecha || !medio_pago) {
@@ -113,8 +120,8 @@ export const registrarPago = async (req, res) => {
 
     // Obtener cliente
     const cliente = await getOne(
-      'SELECT id, razon_social, saldo_cuenta_corriente FROM clientes WHERE id = ?',
-      [cliente_id]
+      'SELECT id, razon_social, saldo_cuenta_corriente FROM clientes WHERE empresa_id = ? AND id = ?',
+      [empresaId, cliente_id]
     );
 
     if (!cliente) {
@@ -140,18 +147,18 @@ export const registrarPago = async (req, res) => {
     await runQuery(`
       INSERT INTO cuenta_corriente (
         cliente_id, tipo_movimiento, monto, saldo_anterior, saldo_nuevo,
-        concepto, fecha, medio_pago, numero_comprobante, observaciones, usuario_id
-      ) VALUES (?, 'credito', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        concepto, fecha, medio_pago, numero_comprobante, observaciones, usuario_id, empresa_id
+      ) VALUES (?, 'credito', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       cliente_id, montoAPagar, saldoAnterior, saldoNuevo,
       'Pago recibido', fecha, medio_pago, numero_comprobante,
-      observaciones, usuario_id
+      observaciones, usuario_id, empresaId
     ]);
 
     // Actualizar saldo del cliente
     await runQuery(
-      'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE id = ?',
-      [saldoNuevo, cliente_id]
+      'UPDATE clientes SET saldo_cuenta_corriente = ? WHERE empresa_id = ? AND id = ?',
+      [saldoNuevo, empresaId, cliente_id]
     );
 
 
@@ -159,8 +166,8 @@ export const registrarPago = async (req, res) => {
     if (medio_pago === 'efectivo') {
       // Buscar caja abierta del usuario
       const cajaAbierta = await getOne(
-        'SELECT id FROM cajas WHERE usuario_apertura_id = ? AND estado = ? ORDER BY fecha_apertura DESC LIMIT 1',
-        [usuario_id, 'abierta']
+        'SELECT id FROM cajas WHERE empresa_id = ? AND usuario_apertura_id = ? AND estado = ? ORDER BY fecha_apertura DESC LIMIT 1',
+        [empresaId, usuario_id, 'abierta']
       );
 
       if (cajaAbierta) {
@@ -168,20 +175,21 @@ export const registrarPago = async (req, res) => {
         await runQuery(`
           INSERT INTO movimientos_caja (
             caja_id, tipo_movimiento, categoria, monto, concepto,
-            numero_comprobante, observaciones, usuario_id
-          ) VALUES (?, 'ingreso', 'pago_cliente', ?, ?, ?, ?, ?)
+            numero_comprobante, observaciones, usuario_id, empresa_id
+          ) VALUES (?, 'ingreso', 'pago_cliente', ?, ?, ?, ?, ?, ?)
         `, [
           cajaAbierta.id, montoAPagar,
           `Pago de ${cliente.razon_social}`,
-          numero_comprobante, observaciones, usuario_id
+          numero_comprobante, observaciones, usuario_id, empresaId
         ]);
 
         // Actualizar totales de la caja
         await runQuery(`
           UPDATE cajas SET 
             total_ingresos = total_ingresos + ?
-          WHERE id = ?
-        `, [montoAPagar, cajaAbierta.id]);
+          WHERE empresa_id = ?
+          AND id = ?
+        `, [montoAPagar, empresaId, cajaAbierta.id]);
 
         console.log(`✓ Registrado en caja: Ingreso de $${montoAPagar} por pago de cliente`);
       } else {
@@ -204,6 +212,7 @@ export const registrarPago = async (req, res) => {
 // Obtener resumen general de cuenta corriente
 export const getResumenGeneral = async (req, res) => {
   try {
+    const empresaId = getEmpresaId(req);
     const stats = await getOne(`
       SELECT
         COUNT(DISTINCT c.id) as total_clientes_con_cc,
@@ -211,17 +220,20 @@ export const getResumenGeneral = async (req, res) => {
         COALESCE(SUM(c.saldo_cuenta_corriente), 0) as deuda_total,
         COALESCE(SUM(CASE WHEN c.saldo_cuenta_corriente > c.limite_credito THEN c.saldo_cuenta_corriente - c.limite_credito ELSE 0 END), 0) as deuda_sobre_limite
       FROM clientes c
-      WHERE c.activo = 1
-    `);
+      WHERE c.empresa_id = ?
+      AND c.activo = 1
+    `, [empresaId]);
 
     // Top 5 clientes con mayor deuda
     const topDeudores = await getAll(`
       SELECT c.id, c.razon_social, c.saldo_cuenta_corriente, c.limite_credito
       FROM clientes c
-      WHERE c.activo = 1 AND c.saldo_cuenta_corriente > 0
+      WHERE c.empresa_id = ?
+      AND c.activo = 1 
+      AND c.saldo_cuenta_corriente > 0
       ORDER BY c.saldo_cuenta_corriente DESC
       LIMIT 5
-    `);
+    `, [empresaId]);
 
     // Movimientos recientes
     const movimientosRecientes = await getAll(`
@@ -229,11 +241,12 @@ export const getResumenGeneral = async (req, res) => {
              c.razon_social as cliente_nombre,
              u.nombre || ' ' || u.apellido as usuario_nombre
       FROM cuenta_corriente cc
-      LEFT JOIN clientes c ON cc.cliente_id = c.id
-      LEFT JOIN usuarios u ON cc.usuario_id = u.id
+      LEFT JOIN clientes c ON cc.empresa_id = c.empresa_id AND cc.cliente_id = c.id
+      LEFT JOIN usuarios u ON cc.empresa_id = u.empresa_id AND cc.usuario_id = u.id
+      WHERE cc.empresa_id = ?
       ORDER BY cc.created_at DESC
       LIMIT 10
-    `);
+    `, [empresaId]);
 
     res.json({
       stats,

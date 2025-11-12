@@ -1,18 +1,20 @@
 import { getAll, getOne, runQuery } from '../db/database.js';
 import bcrypt from 'bcrypt';
+import { getEmpresaId } from '../utils/tenantHelper.js';
 
 // Obtener todos los usuarios
 export const getUsuarios = async (req, res) => {
   try {
     const { activo, rol, sucursal_id } = req.query;
+    const empresaId = getEmpresaId(req);
 
     let sql = `
       SELECT u.*, s.nombre as sucursal_nombre
       FROM usuarios u
-      LEFT JOIN sucursales s ON u.sucursal_id = s.id
-      WHERE 1=1
+      LEFT JOIN sucursales s ON u.empresa_id = s.empresa_id AND u.sucursal_id = s.id
+      WHERE u.empresa_id = ?
     `;
-    const params = [];
+    const params = [empresaId];
 
     if (activo !== undefined) {
       sql += ' AND u.activo = ?';
@@ -47,13 +49,15 @@ export const getUsuarios = async (req, res) => {
 export const getUsuarioById = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
     const usuario = await getOne(`
       SELECT u.*, s.nombre as sucursal_nombre
       FROM usuarios u
-      LEFT JOIN sucursales s ON u.sucursal_id = s.id
-      WHERE u.id = ?
-    `, [id]);
+      LEFT JOIN sucursales s ON u.empresa_id = s.empresa_id AND u.sucursal_id = s.id
+      WHERE u.empresa_id = ?
+      AND u.id = ?
+    `, [empresaId, id]);
 
     if (!usuario) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -81,6 +85,7 @@ export const createUsuario = async (req, res) => {
       rol,
       sucursal_id,
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Validaciones
     if (!username || !nombre || !apellido || !email || !password || !rol) {
@@ -103,8 +108,8 @@ export const createUsuario = async (req, res) => {
 
     // Verificar que el username no exista
     const existenteUsername = await getOne(
-      'SELECT id FROM usuarios WHERE username = ?',
-      [username]
+      'SELECT id FROM usuarios WHERE empresa_id = ? AND username = ?',
+      [empresaId, username]
     );
 
     if (existenteUsername) {
@@ -115,8 +120,8 @@ export const createUsuario = async (req, res) => {
 
     // Verificar que el email no exista
     const existenteEmail = await getOne(
-      'SELECT id FROM usuarios WHERE email = ?',
-      [email]
+      'SELECT id FROM usuarios WHERE empresa_id = ? AND email = ?',
+      [empresaId, email]
     );
 
     if (existenteEmail) {
@@ -131,10 +136,10 @@ export const createUsuario = async (req, res) => {
     // Crear usuario
     const result = await runQuery(`
       INSERT INTO usuarios (
-        username, nombre, apellido, email, password, rol, sucursal_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        username, nombre, apellido, email, password, rol, sucursal_id, empresa_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      username, nombre, apellido, email, hashedPassword, rol, sucursal_id || null
+      username, nombre, apellido, email, hashedPassword, rol, sucursal_id || null, empresaId
     ]);
 
     res.status(201).json({
@@ -160,9 +165,10 @@ export const updateUsuario = async (req, res) => {
       rol,
       sucursal_id,
     } = req.body;
+    const empresaId = getEmpresaId(req);
 
     // Verificar que existe
-    const usuario = await getOne('SELECT * FROM usuarios WHERE id = ?', [id]);
+    const usuario = await getOne('SELECT * FROM usuarios WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     if (!usuario) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -183,8 +189,8 @@ export const updateUsuario = async (req, res) => {
 
     // Verificar que el username no exista en otro usuario
     const existenteUsername = await getOne(
-      'SELECT id FROM usuarios WHERE username = ? AND id != ?',
-      [username, id]
+      'SELECT id FROM usuarios WHERE empresa_id = ? AND username = ? AND id != ?',
+      [empresaId, username, id]
     );
 
     if (existenteUsername) {
@@ -195,8 +201,8 @@ export const updateUsuario = async (req, res) => {
 
     // Verificar que el email no exista en otro usuario
     const existenteEmail = await getOne(
-      'SELECT id FROM usuarios WHERE email = ? AND id != ?',
-      [email, id]
+      'SELECT id FROM usuarios WHERE empresa_id = ? AND email = ? AND id != ?',
+      [map, email, id]
     );
 
     if (existenteEmail) {
@@ -220,6 +226,7 @@ export const updateUsuario = async (req, res) => {
       params.push(hashedPassword);
     }
 
+    params.push(empresaId);
     params.push(id);
 
     // Actualizar
@@ -233,7 +240,8 @@ export const updateUsuario = async (req, res) => {
         sucursal_id = ?
         ${updatePassword},
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE empresa_id = ? 
+      AND id = ?
     `, params);
 
     res.json({ message: 'Usuario actualizado exitosamente' });
@@ -247,8 +255,9 @@ export const updateUsuario = async (req, res) => {
 export const toggleUsuario = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    const usuario = await getOne('SELECT * FROM usuarios WHERE id = ?', [id]);
+    const usuario = await getOne('SELECT * FROM usuarios WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     if (!usuario) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -264,8 +273,8 @@ export const toggleUsuario = async (req, res) => {
     const nuevoEstado = usuario.activo ? 0 : 1;
 
     await runQuery(
-      'UPDATE usuarios SET activo = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [nuevoEstado, id]
+      'UPDATE usuarios SET activo = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+      [nuevoEstado, empresaId, id]
     );
 
     res.json({
@@ -281,8 +290,9 @@ export const toggleUsuario = async (req, res) => {
 export const deleteUsuario = async (req, res) => {
   try {
     const { id } = req.params;
+    const empresaId = getEmpresaId(req);
 
-    const usuario = await getOne('SELECT * FROM usuarios WHERE id = ?', [id]);
+    const usuario = await getOne('SELECT * FROM usuarios WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     if (!usuario) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -298,7 +308,7 @@ export const deleteUsuario = async (req, res) => {
     // TODO: Verificar que no tenga registros asociados (ventas, etc.)
     // Por ahora permitimos eliminar
 
-    await runQuery('DELETE FROM usuarios WHERE id = ?', [id]);
+    await runQuery('DELETE FROM usuarios WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     res.json({ message: 'Usuario eliminado exitosamente' });
   } catch (error) {
@@ -312,6 +322,7 @@ export const cambiarPassword = async (req, res) => {
   try {
     const { id } = req.params;
     const { password_actual, password_nueva } = req.body;
+    const empresaId = getEmpresaId(req);
 
     if (!password_actual || !password_nueva) {
       return res.status(400).json({
@@ -325,7 +336,7 @@ export const cambiarPassword = async (req, res) => {
       });
     }
 
-    const usuario = await getOne('SELECT * FROM usuarios WHERE id = ?', [id]);
+    const usuario = await getOne('SELECT * FROM usuarios WHERE empresa_id = ? AND id = ?', [empresaId, id]);
 
     if (!usuario) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -343,8 +354,8 @@ export const cambiarPassword = async (req, res) => {
 
     // Actualizar
     await runQuery(
-      'UPDATE usuarios SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [hashedPassword, id]
+      'UPDATE usuarios SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE empresa_id = ? AND id = ?',
+      [hashedPassword, empresaId, id]
     );
 
     res.json({ message: 'Contraseña actualizada exitosamente' });
