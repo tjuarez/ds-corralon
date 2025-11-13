@@ -217,7 +217,7 @@ export const createCompra = async (req, res) => {
 
     // ========== OBTENER COTIZACIÓN DEL MOMENTO ==========
     const cotizacionMomento = await getCotizacionActual();
-    console.log(`💱 Cotización del momento: ${cotizacionMomento}`);
+    //console.log(`💱 Cotización del momento: ${cotizacionMomento}`);
 
     // Calcular totales
     let subtotal = 0;

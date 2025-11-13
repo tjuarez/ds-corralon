@@ -32,7 +32,7 @@ const cleanTable = async (tableName, description) => {
     const exists = await tableExists(tableName);
     if (exists) {
       await runQuery(`DELETE FROM ${tableName}`);
-      console.log(`  ✓ ${description}`);
+      //console.log(`  ✓ ${description}`);
     } else {
       console.log(`  ⊘ ${description} (tabla no existe)`);
     }

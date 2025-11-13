@@ -22,7 +22,7 @@ export const enviarPresupuestoPorEmail = async (presupuesto, emailDestino) => {
       throw new Error(error.message || 'Error al enviar email');
     }
 
-    console.log('✅ Email enviado:', data.id);
+    //console.log('✅ Email enviado:', data.id);
     return { success: true, emailId: data.id };
   } catch (error) {
     console.error('❌ Error al enviar email:', error);

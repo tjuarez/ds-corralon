@@ -191,9 +191,9 @@ export const registrarPago = async (req, res) => {
           AND id = ?
         `, [montoAPagar, empresaId, cajaAbierta.id]);
 
-        console.log(`✓ Registrado en caja: Ingreso de $${montoAPagar} por pago de cliente`);
+        //console.log(`✓ Registrado en caja: Ingreso de $${montoAPagar} por pago de cliente`);
       } else {
-        console.warn(`⚠️ No hay caja abierta para registrar pago de $${montoAPagar}`);
+        //console.warn(`⚠️ No hay caja abierta para registrar pago de $${montoAPagar}`);
       }
     }
 

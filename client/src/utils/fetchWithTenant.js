@@ -27,13 +27,13 @@ export const fetchWithTenant = async (url, options = {}) => {
   const isPublicRoute = url.startsWith('/api/auth/') || url.startsWith('/api/health');
 
   // Debug en desarrollo
-  if (process.env.NODE_ENV === 'development') {
+  /*if (process.env.NODE_ENV === 'development') {
     console.log('🔍 fetchWithTenant:', {
       originalUrl: url,
       isPublicRoute,
       tenant,
     });
-  }
+  }*/
 
   // Si NO es ruta pública, incluir tenant en la URL
   let finalUrl = url;
@@ -43,9 +43,9 @@ export const fetchWithTenant = async (url, options = {}) => {
   }
 
   // Debug en desarrollo
-  if (process.env.NODE_ENV === 'development') {
+  /*if (process.env.NODE_ENV === 'development') {
     console.log('🎯 URL final:', finalUrl);
-  }
+  }*/
 
   // Llamar a fetch con la URL y headers actualizados
   return fetch(finalUrl, {

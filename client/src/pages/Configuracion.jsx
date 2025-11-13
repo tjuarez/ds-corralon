@@ -66,7 +66,7 @@ const Configuracion = () => {
       setFacturacion(data.configuracion.facturacion || {});
       setMonedas(data.configuracion.monedas || {});
 
-      console.log('✅ Configuración cargada:', empresaData);
+      //console.log('✅ Configuración cargada:', empresaData);
 
       // Cargar preview del logo si existe
       if (empresaData.logo_url) {
@@ -83,8 +83,8 @@ const Configuracion = () => {
     try {
       setSaving(true);
 
-      console.log('🔍 Estado empresa antes de guardar:', empresa);
-      console.log('🔍 Logo URL:', empresa.logo_url);
+      //console.log('🔍 Estado empresa antes de guardar:', empresa);
+      //console.log('🔍 Logo URL:', empresa.logo_url);
       
       // Convertir objeto empresa a formato clave-valor con prefijo
       const configuraciones = {};
@@ -92,7 +92,7 @@ const Configuracion = () => {
         configuraciones[`empresa_${key}`] = empresa[key] || '';
       });
 
-      console.log('🔍 Configuraciones a enviar:', configuraciones);
+      //console.log('🔍 Configuraciones a enviar:', configuraciones);
 
       await configuracionApi.update(configuraciones);
       showSuccess('Datos de la empresa guardados exitosamente');
@@ -145,7 +145,7 @@ const handleLogoFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    console.log('📁 Archivo seleccionado:', file.name);
+    //console.log('📁 Archivo seleccionado:', file.name);
 
     // Validar tipo de archivo
     if (!file.type.startsWith('image/')) {
@@ -177,15 +177,15 @@ const handleLogoFileChange = async (e) => {
 
       const data = await response.json();
       
-      console.log('✅ Respuesta del servidor:', data);
-      console.log('🖼️ URL de la imagen:', data.imageUrl);
+      //console.log('✅ Respuesta del servidor:', data);
+      //console.log('🖼️ URL de la imagen:', data.imageUrl);
       
       // Actualizar el logo_url en empresa
       const nuevoEstado = { ...empresa, logo_url: data.imageUrl };
       setEmpresa(nuevoEstado);
       setLogoPreview(data.imageUrl);
       
-      console.log('✅ Estado actualizado:', nuevoEstado);
+      //console.log('✅ Estado actualizado:', nuevoEstado);
       
       showSuccess('Logo cargado exitosamente');
     } catch (error) {

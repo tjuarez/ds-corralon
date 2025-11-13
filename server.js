@@ -109,7 +109,8 @@ app.use((err, req, res, next) => {
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor DS-Corralón ejecutándose en http://localhost:${PORT}`);
-  console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🏢 Multi-tenant: Activado`);
+  //console.log(`🚀 Servidor DS-Corralón ejecutándose en http://localhost:${PORT}`);
+  //console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  //console.log(`🏢 Multi-tenant: Activado`);
+  void(0);
 });

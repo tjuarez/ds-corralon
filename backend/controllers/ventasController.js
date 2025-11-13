@@ -249,7 +249,7 @@ export const createVenta = async (req, res) => {
 
     // ========== OBTENER COTIZACIÓN DEL MOMENTO ==========
     const cotizacionMomento = await getCotizacionActual();
-    console.log(`💱 Cotización del momento: ${cotizacionMomento}`);
+    //console.log(`💱 Cotización del momento: ${cotizacionMomento}`);
 
     // Calcular totales
     let subtotal = 0;
@@ -406,7 +406,7 @@ export const createVenta = async (req, res) => {
             WHERE empresa_id = ? AND id = ?
           `, [pago.monto, empresaId, cajaAbierta.id]);
 
-          console.log(`✓ Registrado en caja: Ingreso de $${pago.monto} por venta ${numero_comprobante}`);
+          //console.log(`✓ Registrado en caja: Ingreso de $${pago.monto} por venta ${numero_comprobante}`);
         } else {
           console.warn(`⚠️ No hay caja abierta para registrar venta ${numero_comprobante}`);
         }
@@ -548,7 +548,7 @@ export const anularVenta = async (req, res) => {
             WHERE empresa_id = ? AND id = ?
           `, [pago.monto, empresaId, movimientoCaja.caja_id]);
 
-          console.log(`✓ Revertido en caja: Egreso de $${pago.monto} por anulación de venta`);
+          //console.log(`✓ Revertido en caja: Egreso de $${pago.monto} por anulación de venta`);
         } else {
           console.warn(`⚠️ La caja está cerrada, no se puede revertir automáticamente el movimiento de $${pago.monto}`);
         }

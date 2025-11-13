@@ -22,7 +22,7 @@ const apiFiles = [
   'ventas.js'
 ];
 
-console.log('🔄 Actualizando archivos API...\n');
+//console.log('🔄 Actualizando archivos API...\n');
 
 apiFiles.forEach(file => {
   const filePath = path.join(apiDir, file);
@@ -47,10 +47,10 @@ apiFiles.forEach(file => {
     
     // Escribir el archivo actualizado
     fs.writeFileSync(filePath, content, 'utf8');
-    console.log(`✅ Actualizado: ${file}`);
+    //console.log(`✅ Actualizado: ${file}`);
   } catch (error) {
     console.error(`❌ Error al actualizar ${file}:`, error.message);
   }
 });
 
-console.log('\n✨ Actualización completada!');
+//console.log('\n✨ Actualización completada!');
