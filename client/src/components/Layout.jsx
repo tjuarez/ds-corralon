@@ -100,6 +100,13 @@ const menuItems = [
     );
   }
 
+  // Solo super_admin puede ver gestión de empresas
+  if (user?.rol === 'super_admin') {
+    menuItems.push(
+      { path: buildTenantPath('/super-admin/empresas'), icon: Building2, label: 'Gestión Empresas' }
+    );
+  }
+
   const isActive = (path) => {
     // Considerar activo si la ruta actual comienza con el path del menú
     return location.pathname === path || location.pathname.startsWith(path + '/');

@@ -97,16 +97,18 @@ export const login = async (req, res) => {
       });
     }
 
-    // Buscar usuario dentro de la empresa
+    // Buscar usuario:
+    // 1. Super-admin (sin empresa_id, puede acceder a cualquier empresa)
+    // 2. Usuario normal de la empresa específica
     const user = await getOne(
       `SELECT u.*, s.nombre as sucursal_nombre, e.slug as empresa_slug, e.nombre as empresa_nombre
        FROM usuarios u
        LEFT JOIN sucursales s ON u.sucursal_id = s.id
        LEFT JOIN empresas e ON u.empresa_id = e.id
-       WHERE u.empresa_id = ? 
-       AND u.username = ? 
-       AND u.activo = 1`,
-      [empresa.id, username]
+       WHERE u.username = ? 
+       AND u.activo = 1
+       AND (u.rol = 'super_admin' OR u.empresa_id = ?)`,
+      [username, empresa.id]
     );
 
     if (!user) {
@@ -122,6 +124,13 @@ export const login = async (req, res) => {
       return res.status(401).json({ 
         error: 'Usuario o contraseña incorrectos' 
       });
+    }
+
+    // Si es super_admin, asignar datos de la empresa actual temporalmente
+    if (user.rol === 'super_admin') {
+      user.empresa_id = empresa.id;
+      user.empresa_slug = empresa.slug;
+      user.empresa_nombre = empresa.nombre;
     }
 
     // Generar token (incluir empresa_id y slug)
@@ -170,7 +179,16 @@ export const logout = (req, res) => {
 // Obtener usuario actual
 export const getCurrentUser = async (req, res) => {
   try {
-    const empresaId = getEmpresaId(req);
+    // Para getCurrentUser, usar el empresa_id del usuario autenticado (del token)
+    // No usar getEmpresaId porque esta ruta no tiene tenant en el path
+    const empresaId = req.user.empresa_id;
+    
+    if (!empresaId && req.user.rol !== 'super_admin') {
+      return res.status(403).json({ 
+        error: 'Usuario sin empresa asignada' 
+      });
+    }
+
     const user = await getOne(
       `SELECT u.id, u.username, u.nombre, u.apellido, u.email, u.rol, 
               u.sucursal_id, s.nombre as sucursal_nombre, u.created_at,
@@ -178,10 +196,9 @@ export const getCurrentUser = async (req, res) => {
        FROM usuarios u
        LEFT JOIN sucursales s ON u.sucursal_id = s.id
        LEFT JOIN empresas e ON u.empresa_id = e.id
-       WHERE u.empresa_id = ? 
-       AND u.id = ? 
+       WHERE u.id = ? 
        AND u.activo = 1`,
-      [empresaId, req.user.id]
+      [req.user.id]
     );
 
     if (!user) {

@@ -40,7 +40,9 @@ export const AuthProvider = ({ children }) => {
         setSucursalActiva(sucursal);
       }
     } catch (error) {
+      // Silenciosamente manejar error (usuario no autenticado)
       setUser(null);
+      // NO mostrar error en consola - es esperado en login
     } finally {
       setLoading(false);
     }

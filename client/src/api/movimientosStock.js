@@ -1,3 +1,5 @@
+import { fetchWithTenant } from '../utils/fetchWithTenant';
+
 const API_URL = '/api/movimientos-stock';
 
 export const movimientosStockApi = {
@@ -12,7 +14,7 @@ export const movimientosStockApi = {
     if (filters.fecha_hasta) params.append('fecha_hasta', filters.fecha_hasta);
     if (filters.search) params.append('search', filters.search);
 
-    const response = await fetch(`${API_URL}?${params}`, {
+    const response = await fetchWithTenant(`${API_URL}?${params}`, {
       credentials: 'include',
     });
 
@@ -32,7 +34,7 @@ export const movimientosStockApi = {
     if (filters.fecha_hasta) params.append('fecha_hasta', filters.fecha_hasta);
     if (filters.sucursal_id) params.append('sucursal_id', filters.sucursal_id);
 
-    const response = await fetch(`${API_URL}/resumen?${params}`, {
+    const response = await fetchWithTenant(`${API_URL}/resumen?${params}`, {
       credentials: 'include',
     });
 

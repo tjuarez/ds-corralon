@@ -23,19 +23,22 @@ export const fetchWithTenant = async (url, options = {}) => {
     headers['x-sucursal-activa'] = sucursalActiva.id.toString();
   }
 
-  // Rutas públicas que NO requieren tenant en el path (todas las de /api/auth/)
-  const isPublicRoute = url.startsWith('/api/auth/') || url.startsWith('/api/health');
+  // Rutas públicas/globales que NO requieren tenant en el path
+  const isPublicRoute = 
+    url.startsWith('/api/auth/') || 
+    url.startsWith('/api/health') ||
+    url.startsWith('/api/super-admin/'); // ← AGREGAR
 
   // Debug en desarrollo
-  /*if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development') {
     console.log('🔍 fetchWithTenant:', {
       originalUrl: url,
       isPublicRoute,
       tenant,
     });
-  }*/
+  }
 
-  // Si NO es ruta pública, incluir tenant en la URL
+  // Si NO es ruta pública Y hay tenant, incluir tenant en la URL
   let finalUrl = url;
   if (!isPublicRoute && tenant && url.startsWith('/api/')) {
     // Transformar /api/recurso a /api/tenant/recurso
@@ -43,9 +46,9 @@ export const fetchWithTenant = async (url, options = {}) => {
   }
 
   // Debug en desarrollo
-  /*if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development') {
     console.log('🎯 URL final:', finalUrl);
-  }*/
+  }
 
   // Llamar a fetch con la URL y headers actualizados
   return fetch(finalUrl, {
@@ -54,4 +57,5 @@ export const fetchWithTenant = async (url, options = {}) => {
   });
 };
 
-export default fetchWithTenant;
+// Mantener compatibilidad con el nombre antiguo
+export const fetchWithSucursal = fetchWithTenant;

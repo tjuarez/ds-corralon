@@ -42,6 +42,8 @@ import Usuarios from '../pages/Usuarios';
 import UsuarioForm from '../pages/UsuarioForm';
 import Configuracion from '../pages/Configuracion';
 import MovimientosStock from '../pages/MovimientosStock';
+import GestionEmpresas from '../pages/SuperAdmin/GestionEmpresas';
+import EmpresaForm from '../pages/SuperAdmin/EmpresaForm';
 
 // Componente de redirección a tenant por defecto
 const RedirectToDefaultTenant = () => {
@@ -118,6 +120,12 @@ const AppRoutes = () => {
       <Route path="/:tenant/configuracion" element={<ProtectedRoute><Configuracion /></ProtectedRoute>} />
 
       <Route path="/:tenant/movimientos-stock" element={<ProtectedRoute><MovimientosStock /></ProtectedRoute>} />
+
+      {/* Rutas de Super-Admin */}
+      <Route path="/:tenant/super-admin/empresas" element={<ProtectedRoute><GestionEmpresas /></ProtectedRoute>} />
+      <Route path="/:tenant/super-admin/empresas/nueva" element={<ProtectedRoute><EmpresaForm /></ProtectedRoute>} />
+      <Route path="/:tenant/super-admin/empresas/:id" element={<ProtectedRoute><EmpresaForm /></ProtectedRoute>} /> {/* ← Vista (sin /editar) */}
+      <Route path="/:tenant/super-admin/empresas/:id/editar" element={<ProtectedRoute><EmpresaForm /></ProtectedRoute>} />
 
       {/* Catch-all: redirigir a tenant por defecto */}
       <Route path="*" element={<RedirectToDefaultTenant />} />

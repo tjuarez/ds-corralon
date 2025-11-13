@@ -25,6 +25,7 @@ import usuariosRoutes from './backend/routes/usuarios.js';
 import stockSucursalesRoutes from './backend/routes/stockSucursales.js';
 import configuracionRoutes from './backend/routes/configuracion.js';
 import movimientosStockRoutes from './backend/routes/movimientosStock.js';
+import empresasRoutes from './backend/routes/empresas.js';
 
 // Configuración de variables de entorno
 dotenv.config();
@@ -66,6 +67,9 @@ app.get('/api/health', (req, res) => {
 
 // ========== RUTAS PÚBLICAS (SIN TENANT) ==========
 app.use('/api/auth', authRoutes);
+
+// ========== RUTAS DE SUPER-ADMIN (SIN TENANT) ==========
+app.use('/api/super-admin/empresas', empresasRoutes);
 
 // ========== RUTAS CON TENANT ==========
 // Todas las rutas con /:tenant/ requieren validación de tenant y autenticación
