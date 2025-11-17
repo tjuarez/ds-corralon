@@ -150,4 +150,10 @@ const createMultiTenant = async () => {
   }
 };
 
-createMultiTenant();
+// Exportar la función principal para uso desde otros scripts
+export { createMultiTenant };
+
+// Si se ejecuta directamente
+if (import.meta.url === `file://${process.argv[1]}`) {
+  createMultiTenant();
+}

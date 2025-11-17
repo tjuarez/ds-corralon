@@ -642,5 +642,10 @@ const runMigrations = async () => {
   }
 };
 
-// Ejecutar
-runMigrations();
+// Exportar runMigrations para uso desde otros scripts
+export { runMigrations };
+
+// Si se ejecuta directamente
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runMigrations();
+}

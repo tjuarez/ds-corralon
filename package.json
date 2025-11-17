@@ -9,7 +9,7 @@
     "dev:server": "nodemon server.js",
     "dev:client": "cd client && npm run dev",
     "build": "cd client && npm install && npm run build",
-    "start": "node server.js",
+    "start": "node backend/db/migrate-all.js && node backend/db/seed.js && node server.js",
     "migrate": "node backend/db/migrate.js",
     "init-stock": "node backend/db/inicializar-stock-sucursales.js",
     "seed": "node backend/db/seed.js",

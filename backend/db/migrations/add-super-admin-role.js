@@ -75,4 +75,10 @@ const addSuperAdminRole = async () => {
   }
 };
 
-addSuperAdminRole();
+// Exportar la función principal para uso desde otros scripts
+export { addSuperAdminRole };
+
+// Si se ejecuta directamente
+if (import.meta.url === `file://${process.argv[1]}`) {
+  addSuperAdminRole();
+}
