@@ -3,10 +3,24 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Hacer Resend opcional - solo inicializar si hay API key
+let resend = null;
+
+if (process.env.RESEND_API_KEY) {
+  resend = new Resend(process.env.RESEND_API_KEY);
+  console.log('✅ Resend Email configurado');
+} else {
+  console.log('⚠️  Resend Email no configurado (RESEND_API_KEY no encontrada)');
+}
 
 // Enviar presupuesto por email
 export const enviarPresupuestoPorEmail = async (presupuesto, emailDestino) => {
+
+  if (!resend) {
+    console.log('⚠️  Email no enviado (Resend no configurado):', { to, subject });
+    return { success: false, message: 'Servicio de email no configurado' };
+  }
+
   try {
     const htmlPresupuesto = generarHTMLPresupuesto(presupuesto);
 
