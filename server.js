@@ -48,7 +48,8 @@ app.use(express.urlencoded({ extended: true }));
 // CORS - Configuración para desarrollo y producción
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://corralon.dogosoftware.com'
+  'https://corralon.dogosoftware.com',
+  'https://ds-corralon.onrender.com'
 ];
 
 app.use(cors({
