@@ -20,7 +20,9 @@
     "corralon",
     "gestion",
     "ventas",
-    "stock"
+    "stock",
+    "saas",
+    "multi-tenant"
   ],
   "author": "",
   "license": "ISC",

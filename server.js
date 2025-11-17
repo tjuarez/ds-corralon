@@ -45,13 +45,25 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS - En desarrollo permitir el frontend de Vite
-if (process.env.NODE_ENV === 'development') {
-  app.use(cors({
-    origin: 'http://localhost:5173',
-    credentials: true
-  }));
-}
+// CORS - Configuración para desarrollo y producción
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://corralon.dogosoftware.com'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Permitir requests sin origin (como Postman, mobile apps, same-origin)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error('CORS no permitido'), false);
+    }
+    
+    return callback(null, true);
+  },
+  credentials: true
+}));
 
 // Servir archivos estáticos (uploads, imágenes de productos, etc.)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
