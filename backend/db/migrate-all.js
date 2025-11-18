@@ -1,5 +1,5 @@
 import { runMigrations } from './migrate.js';
-import { runQuery } from './database.js';
+import { runQuery, getAll } from './database.js';
 
 console.log('🔄 Iniciando migraciones completas...\n');
 
@@ -9,7 +9,7 @@ async function createMultiTenant() {
     console.log('Ejecutando migración multi-tenant...');
     
     // Verificar si la tabla empresas ya existe
-    const tableExists = await runQuery(`
+    const tableExists = await getAll(`
       SELECT name FROM sqlite_master 
       WHERE type='table' AND name='empresas'
     `);
@@ -63,8 +63,8 @@ async function createMultiTenant() {
     
     for (const table of tables) {
       try {
-        // Verificar si la columna ya existe
-        const columns = await runQuery(`PRAGMA table_info(${table})`);
+        // Verificar si la columna ya existe usando getAll
+        const columns = await getAll(`PRAGMA table_info(${table})`);
         const hasEmpresaId = columns.some(col => col.name === 'empresa_id');
         
         if (!hasEmpresaId) {
@@ -92,6 +92,17 @@ async function addSuperAdminRole() {
   try {
     console.log('Ejecutando migración super-admin role...');
     
+    // Verificar si el constraint ya permite super_admin
+    const tableInfo = await getAll(`
+      SELECT sql FROM sqlite_master 
+      WHERE type='table' AND name='usuarios'
+    `);
+    
+    if (tableInfo[0]?.sql.includes('super_admin')) {
+      console.log('⚠️  Rol super_admin ya existe, saltando migración...');
+      return;
+    }
+    
     // Desactivar foreign keys
     await runQuery('PRAGMA foreign_keys = OFF');
     
@@ -108,17 +119,22 @@ async function addSuperAdminRole() {
         email TEXT UNIQUE NOT NULL,
         rol TEXT NOT NULL CHECK(rol IN ('super_admin', 'admin', 'vendedor', 'cajero')),
         sucursal_id INTEGER,
-        empresa_id INTEGER,
         activo INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        empresa_id INTEGER,
         FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
         FOREIGN KEY (empresa_id) REFERENCES empresas(id)
       )
     `);
     
-    // Copiar datos
-    await runQuery(`INSERT INTO usuarios_new SELECT * FROM usuarios`);
+    // Copiar datos especificando columnas
+    await runQuery(`
+      INSERT INTO usuarios_new 
+      (id, username, password, nombre, apellido, email, rol, sucursal_id, activo, created_at, updated_at, empresa_id)
+      SELECT id, username, password, nombre, apellido, email, rol, sucursal_id, activo, created_at, updated_at, empresa_id
+      FROM usuarios
+    `);
     
     // Eliminar tabla antigua y renombrar
     await runQuery('DROP TABLE usuarios');
