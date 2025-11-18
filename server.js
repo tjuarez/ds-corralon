@@ -36,6 +36,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy para Render.com
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Middlewares de seguridad y compresión
 app.use(helmet({
   contentSecurityPolicy: false, // Deshabilitado para desarrollo
