@@ -635,10 +635,9 @@ const runMigrations = async () => {
     console.log('   Password: admin123');
     console.log('   ⚠️  IMPORTANTE: Cambiar la contraseña en el primer login');
     
-    process.exit(0);
   } catch (error) {
     console.error('❌ Error en las migraciones:', error);
-    process.exit(1);
+    throw error; // ← CAMBIAR: lanzar error en lugar de exit
   }
 };
 
@@ -647,5 +646,10 @@ export { runMigrations };
 
 // Si se ejecuta directamente
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runMigrations();
+  runMigrations()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error('Error:', error);
+      process.exit(1);
+    });
 }
